@@ -31,17 +31,17 @@ ARVUTUS
     müük järgneb liiklusele).
 
 VÄLJUND (kaust valjund/)
-  02_aegread.png
+  02_01_aegread.png
       Näitab: kas liiklus ja kütusemüük liiguvad ajas koos.
       Kuidas: kaks paneeli üksteise all (bensiin vs kerged sõidukid; diisel vs kaubikud, veokid, bussid). x-telg = aeg,
       y-telg = indeks (2023 = 100). Hall joon = liiklusindeks, värviline joon = müük (sinine bensiin, oranž diisel),
       punktiir = tase 100; märgitud on 2020. a kevade COVID-langus.
-  02_hajuvus_tase.png, 02_hajuvus_yoy.png, 02_hajuvus_stl.png
+  02_02_hajuvus_tase.png, 02_03_hajuvus_yoy.png, 02_04_hajuvus_stl.png
       Näitab: seose tugevust kolmel kujul (tase, aastane muutus, STL jääk).
       Kuidas: hajuvusdiagramm, kaks paneeli (bensiin, diisel). Punkt = üks kuu; x-telg = liiklus, y-telg = müük samal
       kujul. Joon = lineaarne regressioon koos 95% usalduspiirkonnaga. Musta ringiga on märts-mai 2020. Paneeli
       nurgas r, p, rho ja n ning r ja rho ilma COVID-kuudeta.
-  02_viitega_korrelatsioon.png
+  02_05_viitega_korrelatsioon.png
       Näitab: kas kütusemüük reageerib liiklusele kohe või viitega.
       Kuidas: joondiagramm; x-telg = nihe poolkuudes (-4...+4), y-telg = aastaste muutuste Pearsoni r. Sinine =
       bensiin vs kerged, oranž = diisel vs kaubikud, veokid, bussid; püstine punktiir = nihe 0.
@@ -93,7 +93,7 @@ axes[0].annotate("COVID-19\nkevad 2020", xy=(pd.Timestamp("2020-04-01"), 72),
                  xytext=(pd.Timestamp("2020-10-01"), 62), fontsize=8, color=TEXT2,
                  arrowprops=dict(arrowstyle="-", color=TEXT2, lw=0.6))
 month_axis(axes[1])
-save(fig, "02_aegread")
+save(fig, "02_01_aegread")
 
 # 2) Korrelatsioonid kolmel kujul -----------------------------------------------------
 rows = []
@@ -143,10 +143,10 @@ def scatter_panel(kuju, name, xlabel, ylabel):
     save(fig, name)
 
 
-scatter_panel("tase", "02_hajuvus_tase", f"Liiklusindeks ({BASE_YEAR}=100)",
+scatter_panel("tase", "02_02_hajuvus_tase", f"Liiklusindeks ({BASE_YEAR}=100)",
               f"Müügiindeks ({BASE_YEAR}=100)")
-scatter_panel("YoY", "02_hajuvus_yoy", "Liikluse aastane muutus, %", "Müügi aastane muutus, %")
-scatter_panel("STL jääk", "02_hajuvus_stl", "Liikluse STL-jääk, %", "Müügi STL-jääk, %")
+scatter_panel("YoY", "02_03_hajuvus_yoy", "Liikluse aastane muutus, %", "Müügi aastane muutus, %")
+scatter_panel("STL jääk", "02_04_hajuvus_stl", "Liikluse STL-jääk, %", "Müügi STL-jääk, %")
 
 # 3) Elastsus: log(kütus) ~ log(liiklus) + kuu näivmuutujad + trend ---------------------
 el_rows = []
@@ -201,5 +201,5 @@ ax.set_xlabel("Nihe, poolkuud (positiivne = müük järgneb liiklusele)")
 ax.set_ylabel("Pearson r (aastased muutused)")
 ax.set_title("Liikluse ja kütusemüügi korrelatsioon nihkega (poolkuu andmed, 2021-2026)")
 ax.legend(fontsize=9, loc="upper right")
-save(fig, "02_viitega_korrelatsioon")
+save(fig, "02_05_viitega_korrelatsioon")
 print("Valmis.")

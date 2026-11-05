@@ -14,26 +14,26 @@ ANALÜÜSID: ARVUTUS JA VÄLJUND (kaust valjund/)
      ruum = täistase x (1 - täituvus) / 4 sõidukit, kus täituvus = akna keskmine läbilase / täistase - nii palju
      sõidukeid mahuks veel aknasse, enne kui tsüklid täis saavad. Võrdluseks ummiku ajal 15 min jooksul läbiv sõidukite
      arv (täistase / 4): nii palju sõite peaks nihkuma, et ummik 15 min lüheneks. Manöövri väärtus = päevade mediaan.
-     10_vaba_ruum.png   soojuskaart; rida = manööver ja tipp (22 pikimat ummikut; sildis ummiku kestus ja sõidukeid
+     10_01_vaba_ruum.png   soojuskaart; rida = manööver ja tipp (22 pikimat ummikut; sildis ummiku kestus ja sõidukeid
                         15 min jooksul ummiku ajal), veerg = aken (45-60 ... 0-15 min enne | 0-15 ... 45-60 min pärast;
                         must joon = ummik). Ruudus vaba ruum sõidukites; värv = vaba ruum % ummikuaegsest läbilaskest.
      10_vaba_ruum.csv
   2) Küllastus. Iga ristmiku iga veerandtunni kohta: täis tsüklites (vabal voolul ummikukiirusel) liikunud sõidukite
      osakaal ristmiku kõigist sõidukitest, %.
-     10_kullastus.png         soojuskaart; rida = ristmik (järjestatud keskmise küllastuse järgi), veerg = veerandtund
+     10_02_kullastus.png         soojuskaart; rida = ristmik (järjestatud keskmise küllastuse järgi), veerg = veerandtund
                               06-20; värv = osakaal 0-100% (tumedam oranž = rohkem liiklust täis tsüklites).
-     10_kullastus_kaart.png   kaks kaarti ortofototaustal (hommik, õhtu). Värviline ring = ristmik, selle pikim
+     10_03_kullastus_kaart.png   kaks kaarti ortofototaustal (hommik, õhtu). Värviline ring = ristmik, selle pikim
                               stabiilne ummik: värv = ummiku algus (hilisem = tumedam), suurus = kestus (tööpäevade
                               mediaan). Väike valge ring = stabiilset ummikut pole.
      10_kullastus.csv
   3) Päevade võrdlus. Manöövri ummiku alguse ja lahenemise vähim, mediaan, suurim ja standardhälve (min) üle tööpäevade.
-     10_paevade_vordlus.png   (vajab >= 2 tööpäeva) rida = manööver ja tipp, x-telg = kellaaeg. Sinine punkt = ummiku
+     10_04_paevade_vordlus.png   (vajab >= 2 tööpäeva) rida = manööver ja tipp, x-telg = kellaaeg. Sinine punkt = ummiku
                               algus igal päeval, oranž punkt = lahenemine, hall riba = mediaanalgusest
                               mediaanlahenemiseni.
      10_paevade_vordlus.csv
   4) Vool ja kiirus vaba vooluga radadel (5 min aknad): vool = sõidukeid x 12 (sõidukit tunnis), kiirus = sõidukite
      keskmine. Läbilaskevõime = voolu 99. protsentiil; kiirus läbilaskevõimel = mediaankiirus, kui vool on >= 95% sellest.
-     10_vool_kiirus.png   hajuvusdiagrammid kuni 9 suurima manöövri kohta; punkt = 5 min, x = vool, y = kiirus, värv =
+     10_05_vool_kiirus.png   hajuvusdiagrammid kuni 9 suurima manöövri kohta; punkt = 5 min, x = vool, y = kiirus, värv =
                           kellaaeg. Püstine katkendjoon = läbilaskevõime, oranž katkendjoon = 70% vabast kiirusest.
      10_vool_kiirus.csv
   5) Järjekorra tühjenemine (kindla tsükliga manöövrite täis tsüklid, raja kaupa). Vahe esiotsast esiotsani = eelmise
@@ -42,7 +42,7 @@ ANALÜÜSID: ARVUTUS JA VÄLJUND (kaust valjund/)
      Sõiduk on järjekorras seni, kuni ajavahe eelmisega on <= 4 s. Küllastusvahe = järjekorra 5. ja tagumiste sõidukite
      vahede mediaan; küllastusvoog rajal = 3600 / küllastusvahe; stardikadu = 2.-4. sõiduki vahede ja küllastusvahe
      erinevuste summa.
-     10_kullastusvoog.png   vasakul vahe eelmise sõidukiga järjekorra koha (2-12) järgi: sinine joon = manöövrite
+     10_06_kullastusvoog.png   vasakul vahe eelmise sõidukiga järjekorra koha (2-12) järgi: sinine joon = manöövrite
                             mediaan, vöönd = kvartiilid, oranž katkendjoon = küllastusvahe. Paremal rõhtsad tulbad =
                             küllastusvoog raja kohta 25 kõige sagedamini täis manöövril; katkendjoon = kõigi mediaan.
      10_kullastusvoog.csv
@@ -50,13 +50,13 @@ ANALÜÜSID: ARVUTUS JA VÄLJUND (kaust valjund/)
      vahedest: pika sõiduki kulutatud aeg = tema vahe eelmisega + järgmise sõiduauto vahe temaga, võrreldes auto-auto
      vahega; sõiduauto ekvivalent = (vahe pikal + vahe autol pika järel) / vahe autol auto järel - 1. (Tsüklite
      loenduse võrdlus eksitaks: tihedamas tsüklis on juhuslikult ka rohkem pikki.)
-     10_pikad_soidukid.png   vasakul joondiagramm: pikkade osakaal, % kellaaja järgi (tume = kõik, sinine = LSS, oranž =
+     10_07_pikad_soidukid.png   vasakul joondiagramm: pikkade osakaal, % kellaaja järgi (tume = kõik, sinine = LSS, oranž =
                              LVS). Paremal tulbad: vahe mediaan täis tsüklis - sõiduauto auto järel, pikk sõiduk auto
                              järel, sõiduauto pika järel; pealkirjas, mitme sõiduauto aja üks pikk sõiduk kulutab.
      10_pikad_soidukid.csv, 10_pikad_moju.csv
   7) Hooga läbijad: sõidukite osakaal, kes läbivad loenduri vähemalt 80% manöövri vabast kiirusest (kiiruste 85.
      protsentiil) ehk ei alusta paigalt - näitab, kui hästi saabutakse rohelise ajal. Kindla tsükliga manöövrid.
-     10_hooga.png   soojuskaart; rida = ristmik, veerg = pooltund 06-20; värv = hooga läbijate osakaal, % (0-80).
+     10_08_hooga.png   soojuskaart; rida = ristmik, veerg = pooltund 06-20; värv = hooga läbijate osakaal, % (0-80).
      10_hooga.csv   sama manöövri ja tunni kaupa
   8) Linna koonddiagramm (kogu linn ühe punktina, 5 min aknad, kell 6-20).
      a) Klassikaline vool vs tihedus: vool = sõidukit tunnis raja kohta, tihedus = summa(1 / kiirus) ajaühikus raja
@@ -64,7 +64,7 @@ ANALÜÜSID: ARVUTUS JA VÄLJUND (kaust valjund/)
      b) Linna läbilase (kõik manöövrid kokku, % 99. protsentiilist) vs täis tsüklites liikuvate sõidukite osakaal.
         Murdepunkt = läbilaske tase, millest alates küllastus kasvama hakkab (murtud joone sobitus vähimruutudega:
         tasane kuni murdepunktini, sealt lineaarne), ja mitu tundi tööpäevas ollakse sellest üle.
-     10_linna_koonddiagramm.png   kaks hajuvusdiagrammi; punkt = 5 min ühel tööpäeval, värv = kellaaeg. Vasakul x =
+     10_09_linna_koonddiagramm.png   kaks hajuvusdiagrammi; punkt = 5 min ühel tööpäeval, värv = kellaaeg. Vasakul x =
                                   tihedus, y = vool, katkendjoon = võrdeline seos. Paremal x = linna läbilase, %
                                   suurimast, y = täis tsüklite osakaal, %; oranž murdjoon = sobitus, püstine
                                   katkendjoon = murdepunkt.
@@ -163,7 +163,7 @@ ax.set_ylabel("")
 ax.axvline(4, color="black", lw=1.5)
 ax.set_title("Vaba ruum ummiku ümber: mitu sõidukit mahuks veel 15 min aknasse, enne kui tsüklid täis saavad\n"
              "(rea järel: tipp; ummiku kestus; sõidukeid 15 min jooksul ummiku ajal)", fontsize=10)
-save(fig, "10_vaba_ruum")
+save(fig, "10_01_vaba_ruum")
 
 # --- 2) Küllastus: soojuskaart ja kaart ----------------------------------------------------------------
 c["veerand"] = (c["t"] // 900).astype(int)
@@ -183,7 +183,7 @@ ax.set_xticklabels([f"{h:02d}" for h in range(6, 21)], rotation=0)
 ax.set_xlabel("Kellaaeg")
 ax.set_ylabel("")
 ax.set_title(f"Küllastus ristmiku ja kellaaja kaupa ({PAEVI} tööpäeva keskmine): kui suur osa liiklusest liigub täis tsüklites")
-save(fig, "10_kullastus")
+save(fig, "10_02_kullastus")
 
 u2 = um.groupby(KEY + ["tipp"]).agg(algus_h=("algus_h", "median"), kestus_min=("kestus_min", "median")).reset_index()
 jk = jn.dropna(subset=["lat"])
@@ -219,7 +219,7 @@ for ax, (tipp, cmap) in zip(axes, [("hommik", "Blues"), ("õhtu", "Oranges")]):
     ax.set_title(f"{tipp.capitalize()}: {int(on.sum())} ristmikul stabiilne ummik", fontsize=11)
 fig.suptitle("Iga ristmiku pikim ummik: värv = algus, suurus = kestus (tööpäevade mediaan)", x=0.01, ha="left",
              fontweight="bold")
-save(fig, "10_kullastus_kaart")
+save(fig, "10_03_kullastus_kaart")
 
 # --- 3) Päevade võrdlus: ummiku alguse ja lahenemise kõikumine --------------------------------------------
 p = (um.groupby(KEY + ["manoeuvre", "meetod", "tipp"])
@@ -248,7 +248,7 @@ if len(pt):
     ax.xaxis.set_major_formatter(lambda q, _: hhmm(q))
     ax.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.07), ncol=2)
     ax.set_title(f"Kui korrapärane on ummik: algus ja lahenemine tööpäevade kaupa ({PAEVI} päeva)")
-    save(fig, "10_paevade_vordlus")
+    save(fig, "10_04_paevade_vordlus")
 else:
     print("\n3) Päevade võrdlus: tabel tehtud; joonis vajab vähemalt 2 tööpäeva sama manöövri ummikuga.")
 
@@ -290,7 +290,7 @@ fig.supxlabel("Vool, sõidukit tunnis (5 min aken)", color=TEXT2)
 fig.supylabel("Kiirus, km/h", color=TEXT2)
 fig.suptitle("Vool ja kiirus vaba vooluga radadel (punkt = 5 min; püstjoon = läbilaskevõime, oranž = 70% vabast kiirusest)",
              x=0.01, ha="left", fontweight="bold")
-save(fig, "10_vool_kiirus")
+save(fig, "10_05_vool_kiirus")
 
 # --- Sõidukid tsüklitesse (5-7) ---------------------------------------------------------------------------
 print("\nLaen sõidukipõhised loendused...")
@@ -368,7 +368,7 @@ ax.set_yticklabels([silt.get(k, str(k)) for k in kt.index], fontsize=7.5)
 ax.set_xlabel("Küllastusvoog, sõidukit tunnis raja kohta (katkendjoon = kõigi mediaan)")
 ax.set_title("Küllastusvoog: 25 kõige sagedamini täis manöövrit", fontsize=10)
 fig.tight_layout()
-save(fig, "10_kullastusvoog")
+save(fig, "10_06_kullastusvoog")
 
 # --- 6) Pikad sõidukid: mõju täis tsükli sõidukite arvule (vahedest) ----------------------------------------
 kv = kyll[kyll["eel_pikk"].notna()].copy()
@@ -414,7 +414,7 @@ axes[1].set_ylim(0, vahed.max() * 1.18)
 axes[1].set_title(f"1 pikk sõiduk kulutab {pce:.1f} sõiduauto aja:\ntäis tsüklisse mahub iga pika kohta "
                   f"{pce - 1:.1f} sõidukit vähem", fontsize=10)
 fig.tight_layout()
-save(fig, "10_pikad_soidukid")
+save(fig, "10_07_pikad_soidukid")
 
 # --- 7) Hooga läbijad (rohelisel saabumine) -------------------------------------------------------------------
 s7 = c[c["meetod"] == "kindel"].assign(pool=lambda z: (z["t"] // 1800).astype(int), tund=lambda z: (z["t"] // 3600).astype(int))
@@ -439,7 +439,7 @@ ax.set_xticklabels([f"{h:02d}" for h in range(6, 21)], rotation=0)
 ax.set_xlabel("Kellaaeg")
 ax.set_ylabel("")
 ax.set_title("Rohelisel saabumine: hooga läbijate osakaal ristmiku ja kellaaja kaupa (kindla tsükliga manöövrid, tööpäevad)")
-save(fig, "10_hooga")
+save(fig, "10_08_hooga")
 
 # --- 8) Linna koonddiagramm: kas kogu linnal on murdepunkt? --------------------------------------------------
 v8 = v[v["kiirus"] > 0]
@@ -481,5 +481,5 @@ axes[1].set_title(f"Küllastuse murdepunkt: {x0:.0f}% suurimast läbilaskest ({u
                   f"sealt edasi lisab iga +1% liiklust {b0:.1f} protsendipunkti täis tsükleid", fontsize=10)
 fig.colorbar(sc, ax=axes, shrink=0.8, label="Kellaaeg")
 fig.suptitle(f"Kogu linn ühe punktina (5 min, {PAEVI} tööpäeva, kell 6–20)", x=0.01, ha="left", fontweight="bold")
-save(fig, "10_linna_koonddiagramm")
+save(fig, "10_09_linna_koonddiagramm")
 print("Valmis.")

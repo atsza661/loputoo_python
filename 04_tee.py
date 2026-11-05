@@ -22,20 +22,20 @@ ARVUTUS
      Kirjeldav, sest aastaid on vähe.
 
 VÄLJUND (kaust valjund/)
-  04_labisoit_vs_adt.png
+  04_01_labisoit_vs_adt.png
       Näitab: kas suurema loendatud liiklusega teel on ka suurem läbisõit (2023).
       Kuidas: mullidiagramm; punkt = põhimaantee (silt T + tee number), x-telg = tee loendurite keskmine ööpäevane
       liiklus, y-telg = läbisõit, mln sõidukikm; mulli suurus = loendurite arv. Nurgas r, rho ja teede arv.
-  04_labisoit_muutus.png
+  04_02_labisoit_muutus.png
       Näitab: kas loendurite liikluse aastane muutus langeb kokku ametliku läbisõidu muutusega.
       Kuidas: hajuvusdiagramm; punkt = tee-aasta, x-telg = samade loendurite liikluse muutus, %, y-telg = läbisõidu
       muutus, %; joon = lineaarne regressioon usalduspiirkonnaga, nulljooned; nurgas r, p, rho, n.
-  04_loendur_r_tee.png
+  04_03_loendur_r_tee.png
       Näitab: kui erinevalt järgivad sama tee loendurid maakonna kütusemüüki.
       Kuidas: karpdiagramm punktidega; x-telg = tee number (teed, millel on >= 3 loendurit, järjestatud bensiini
       mediaani järgi), y-telg = aastaste muutuste Pearsoni r. Punkt = loendur; sinine = bensiin vs kerged, oranž =
       diisel vs kaubikud-veokid-bussid.
-  04_loendur_r_kaart.png
+  04_04_loendur_r_kaart.png
       Näitab: kus Eestis on loenduri liiklus oma maakonna kütusemüügiga tugevalt seotud.
       Kuidas: kaks kaarti (bensiin, diisel) ortofototaustal. Ring = loendur; värv = r (sinine -1 ... punane +1),
       suurus = ööpäevane liiklus.
@@ -94,7 +94,7 @@ ax.text(0.03, 0.96, f"r = {c['r']:.2f}, ρ = {c['rho']:.2f}, n = {c['n']} teed",
 ax.set_xlabel("Tee loendurite keskmine ööpäevane liiklus 2023, sõidukit/ööp")
 ax.set_ylabel("Läbisõit 2023, mln sõidukikm")
 ax.set_title("Põhimaanteede läbisõit vs loendurite liiklus (mulli suurus = loendurite arv)")
-save(fig, "04_labisoit_vs_adt")
+save(fig, "04_01_labisoit_vs_adt")
 
 # --- b) Aastased muutused: fikseeritud loendurite komplekt kahe aasta vahel -------------------
 rows = []
@@ -121,7 +121,7 @@ ax.axvline(0, color=TEXT2, lw=0.6)
 ax.set_xlabel("Loendurite liikluse aastane muutus, % (samad loendurid)")
 ax.set_ylabel("Läbisõidu aastane muutus, %")
 ax.set_title("Põhimaanteed: läbisõidu ja loendatud liikluse aastased muutused")
-save(fig, "04_labisoit_muutus")
+save(fig, "04_02_labisoit_muutus")
 
 # --- c) Iga loendur vs oma maakonna kütus ----------------------------------------------------
 fuel = load_fuel_county()
@@ -160,7 +160,7 @@ ax.legend(h[:2], [FUEL_LABEL[x] for x in l[:2]], loc="lower left", fontsize=9)
 ax.set_xlabel("Tee number (≥3 loendurit)")
 ax.set_ylabel("Pearson r (aastased muutused)")
 ax.set_title("Üksiku loenduri liiklus vs oma maakonna kütusemüük, tee kaupa")
-save(fig, "04_loendur_r_tee")
+save(fig, "04_03_loendur_r_tee")
 
 lo0, lo1, la0, la1 = pc["lon"].min(), pc["lon"].max(), pc["lat"].min(), pc["lat"].max()
 ext = (lo0 - 0.04 * (lo1 - lo0), la0 - 0.10 * (la1 - la0), lo1 + 0.04 * (lo1 - lo0), la1 + 0.05 * (la1 - la0))
@@ -177,7 +177,7 @@ print("Kaardi taust:", att or "puudub (plaaditeenus ei vastanud - joonistati ilm
 fig.suptitle("Loendurite korrelatsioon oma maakonna kütusemüügiga (mulli suurus = liiklusmaht)",
              x=0.01, ha="left", fontweight="bold")
 fig.get_layout_engine().set(h_pad=0.1)
-save(fig, "04_loendur_r_kaart")
+save(fig, "04_04_loendur_r_kaart")
 
 # --- d) Riigi aastane läbisõit vs kütusemüük ---------------------------------------------------
 labs = tabel("import_raw.labisoit")

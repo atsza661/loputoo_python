@@ -23,17 +23,17 @@ ARVUTUS
     Standardvead on klasterdatud maakonna järgi. Paarid: bensiin-kerged, diisel-kaubikud/veokid/bussid, kokku-kokku.
 
 VÄLJUND (kaust valjund/)
-  03_korrelatsioon_heatmap.png
+  03_01_korrelatsioon_heatmap.png
       Näitab: kui tugev on seos igas maakonnas ja kas see püsib pärast hooajalisuse eemaldamist.
       Kuidas: soojuskaart; rida = maakond (sulgudes loendurite arv, järjestatud loendurite arvu järgi), veerg = kütus x
       kuju (Bensiin / Diisel x tase, YoY, STL jääk). Ruudus on Pearsoni r; värv sinisest (-1) läbi heleda (0)
       punaseni (+1).
-  03_hajuvus_yoy_bensiin.png, 03_hajuvus_yoy_diisel.png
+  03_02_hajuvus_yoy_bensiin.png, 03_03_hajuvus_yoy_diisel.png
       Näitab: aastaste muutuste seost maakondade kaupa.
       Kuidas: väikesed hajuvusdiagrammid, üks paneel maakonna kohta (5 reas). Punkt = kuu; x-telg = liikluse aastane
       muutus, %, y-telg = müügi aastane muutus, %; joon = lineaarne regressioon usalduspiirkonnaga; nurgas r. Telgede
       ulatus on igal paneelil oma.
-  03_aegread_maakonnad.png
+  03_04_aegread_maakonnad.png
       Näitab: liikluse ja kogu kütusemüügi käiku igas maakonnas.
       Kuidas: joondiagrammide ruudustik (5 x 3), paneel maakonna kohta (pealkirjas loendurite arv). Hall =
       liiklusindeks (kõik sõidukid), oranž = bensiini ja diisli müük kokku; mõlemad 2023 = 100 (punktiir).
@@ -103,10 +103,10 @@ ax.set_xlabel("")
 ax.set_ylabel("Maakond (loendurite arv)")
 ax.set_title("Liikluse ja kütusemüügi korrelatsioon maakonniti")
 ax.tick_params(axis="x", rotation=0)
-save(fig, "03_korrelatsioon_heatmap")
+save(fig, "03_01_korrelatsioon_heatmap")
 
 # 2) Väikesed mitmikud: aastased muutused -------------------------------------------------
-for f, g in PAIRS:
+for nr, (f, g) in enumerate(PAIRS, 2):          # joonised 03_02 (bensiin) ja 03_03 (diisel)
     y = []
     for mk, g_df in df.groupby("maakond_full"):
         s = g_df.set_index("kuu")
@@ -128,7 +128,7 @@ for f, g in PAIRS:
     grid.figure.supylabel(f"{FUEL_LABEL[f]} müügi aastane muutus, %", color=TEXT2)
     grid.figure.suptitle(f"{FUEL_LABEL[f]} vs {GROUP_LABEL[g].lower()}: aastased muutused maakonniti",
                          x=0.01, ha="left", y=1.03, fontweight="bold")
-    save(grid.figure, f"03_hajuvus_yoy_{f}")
+    save(grid.figure, f"03_{nr:02d}_hajuvus_yoy_{f}")
 
 # 3) Aegread maakonniti (kõik sõidukid vs kogu kütus) ------------------------------------------
 df["kutus_kokku_idx"] = (df["bensiin"] + df["diisel"]) / df["maakond_full"].map(
@@ -149,7 +149,7 @@ fig.legend(handles, labels, loc="upper left", ncol=2, bbox_to_anchor=(0.01, 1.0)
 fig.suptitle(f"Liiklusindeks ja kütusemüük maakonniti ({BASE_YEAR} = 100)", x=0.01, y=1.02,
              ha="left", fontweight="bold")
 fig.tight_layout()
-save(fig, "03_aegread_maakonnad")
+save(fig, "03_04_aegread_maakonnad")
 
 # 4) Paneelregressioon ---------------------------------------------------------------------------
 # log(kütus) ~ log(liiklus) + maakonna FE + kalendrikuu FE [+ aasta-kuu FE]

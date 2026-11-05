@@ -38,7 +38,9 @@ FAILI OSAD
   sõidukiklassid ja värvid; jooniste stiil; andmebaas; maanteeloendurite laadimine ja puhastus (load_daily,
   counter_month, traffic_index); kütusemüük; aegridade abifunktsioonid (yoy, stl_resid, corr_pair); Tallinna ristmikud
   (kalender, load_tallinn, sõidukipõhised kirjed, 5 min jaotus, DATEX); tipptunnid, hajutamine ja ummiku määratlus
-  (peak_metrics, shift_peak, ummikumask); satelliitaluskaart (add_basemap).
+  (peak_metrics, shift_peak, ummikumask); stsenaariumid 40_* jaoks (foori viivitus hcm_viivitus, ummikuosa seos pav,
+  sts_andmed, sts_naitajad, sts_nihete_voit, päevast päeva kõikumine paeva_mura); muutuva pikkusega tipuaeg 06_2 ja
+  07_2 jaoks (tipuaja_lavi, tipuaeg, tipuaja_naitajad, ristmike_tipumura); satelliitaluskaart (add_basemap).
 """
 import contextlib
 import functools
@@ -46,11 +48,16 @@ import inspect
 import os
 import tempfile
 import re
+import warnings
 from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as pe
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.lines import Line2D
+from matplotlib.patches import Rectangle
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -91,6 +98,12 @@ GROUPS = {
 }
 GROUP_LABEL = {"kokku": "Kõik sõidukid", "kerge": "Kerged (kl 1-3)",
                "raske": "Kaubikud, veokid, bussid (kl 4-10)", "veok": "Rasked veokid (kl 6-8)"}
+# Pikkusrühmad (14). Ristmike sõidukikirjetes on pikkus mõõdetud (PIKKUS_PIIRID, m). Maanteeloendur annab ainult klassi,
+# seega on klasside jaotus pikkusrühmadesse hinnang: sõiduauto, pakiauto ja väikebuss alla 6 m; haagisega sõiduauto,
+# veoauto ja buss 6-12 m (liinibuss on piiril); haagisega veoauto ja sadulrong üle 12 m.
+PIKKUS = {"luhike": ["1", "2", "4", "9"], "keskmine": ["3", "5", "6", "10"], "pikk": ["7", "8"]}
+PIKKUS_PIIRID = [0, 6, 12, np.inf]
+PIKKUS_LABEL = {"luhike": "Lühikesed (alla 6 m)", "keskmine": "Keskmised (6-12 m)", "pikk": "Pikad, autorongid (üle 12 m)"}
 
 SPEED_COLS = ["<40Kph", "40-<50", "50-<60", "60-<70", "70-<80", "80-<90",
               "90-<100", "100-<110", "110-<120", "120-<130", "=>130"]
@@ -156,7 +169,7 @@ def save_table(df, name, index=False):
 # Ühenduse andmed ei ole koodis. Fail db_yhendus.txt (selle faili kõrval, repost väljas) sisaldab libpq võtmeid kujul
 #   host=... port=5432 dbname=... user=...
 # Faili puudumisel kasutab libpq keskkonnamuutujaid PGHOST, PGPORT, PGDATABASE, PGUSER. Kasutajal piisab
-# lugemisõigusest; parool tuleb libpq paroolifailist (pgpass.conf), mitte koodist ega sellest failist.
+# lugemisõigusest; parool tuleb libpq paroolifailist (~/.pgpass), mitte koodist ega sellest failist.
 _YHENDUS = DATA_DIR / "db_yhendus.txt"
 DB = dict(x.split("=", 1) for x in _YHENDUS.read_text(encoding="utf-8").split()) if _YHENDUS.exists() else {}
 CACHE = DATA_DIR / "db_cache"       # suurte päringute kohalik puhver (vt puhver); võib alati kustutada
@@ -387,27 +400,40 @@ def mediaani_uv(x, n=2000):
     return np.percentile(m, [2.5, 97.5])
 
 
+KOHANIMI_VEAD = {"talinn": "tallinn", "kanam": "kanama"}     # kirjavead radade nimedes (Kodasoo, Juuliku 1)
+
+
 def ends(label):
-    """Maanteeloenduri raja nimi (traffic.counter_channel) -> (lähtekoht, sihtkoht): '3: Tartu - Tallinn 1' -> ('tartu', 'tallinn')."""
+    """Maanteeloenduri raja nimi (traffic.counter_channel) -> (lähtekoht, sihtkoht): '3: Tartu - Tallinn 1' -> ('tartu', 'tallinn').
+    Kirjavead parandatakse (KOHANIMI_VEAD), et sama suuna rajad tuleksid kokku."""
     body = re.sub(r"^\s*\d+\s*:\s*", "", str(label)).lower()
     parts = [p.strip() for p in body.split(" - ")]
     if len(parts) != 2:
         return "", ""
-    clean = lambda p: re.sub(r"\s+(l?\d+|i+)$", "", p).strip()
+    clean = lambda p: (lambda q: KOHANIMI_VEAD.get(q, q))(re.sub(r"\s+(l?\d+|i+)$", "", p).strip())
     return clean(parts[0]), clean(parts[1])
 
 
-_KOKKU = " + ".join(f'"{c}"' for c in CLASS_COLS)      # kõik sõidukiklassid kokku (SQL)
+assert ends("3: Narva - Talinn 2") == ("narva", "tallinn") and ends("1: Luige - Kanam") == ("luige", "kanama")
 
 
 def load_15m(algus="2024-08-01"):
-    """Maanteeloendurite 15 min loendused (import_raw."15m_count") alates kuupäevast: id, kanal, ts (veerandtunni
-    algus), v (sõidukeid, kõik klassid kokku). Sama veerandtund kaks korda (kordusimport, kellakeeramine) = keskmine.
-    Pikk ajalugu on Harjumaa loenduritel; teistel ainult üksikud päevad."""
+    """Maanteeloendurite 15 min loendused (import_raw."15m_count") alates kuupäevast, rida = loendur, kanal (rada) ja
+    veerandtund: id, kanal, ts (veerandtunni algus) ja sõidukite arvud
+      v                       kõik klassid kokku
+      luhike, keskmine, pikk  pikkusrühmade kaupa (PIKKUS: klassid -> < 6 m, 6-12 m, >= 12 m)
+      alla40                  kiirusega alla 40 km/h (väikseim kiirusvahemik)
+      ks, kn                  kiiruste summa (vahemike keskpunktid x sõidukite arv) ja kiirusega sõidukite arv;
+                              keskmine kiirus = ks / kn (enne jagamist võib radu ja veerandtunde liita)
+    Sama veerandtund kaks korda (kordusimport, kellakeeramine) = keskmine. Pikk ajalugu on Harjumaa loenduritel;
+    teistel ainult üksikud päevad."""
+    summa = lambda veerud, kaal=None: " + ".join(f'"{c}"' + (f" * {kaal[c]}" if kaal else "") for c in veerud)
+    veerud = {"v": summa(CLASS_COLS), **{g: summa(k) for g, k in PIKKUS.items()}, "alla40": f'"{SPEED_COLS[0]}"',
+              "ks": summa(SPEED_COLS, SPEED_MID), "kn": summa(SPEED_COLS)}
     return puhver("15m_count", ["15m_count"], sql,
-                  f'SELECT id, kanal, aeg AS ts, AVG({_KOKKU}) AS v FROM import_raw."15m_count" '
-                  f"WHERE aeg >= '{algus}' GROUP BY id, kanal, aeg ORDER BY id, kanal, aeg",
-                  dtype={"id": str}, parse_dates=["ts"])
+                  "SELECT id, kanal, aeg AS ts, " + ", ".join(f"AVG({s}) AS {n}" for n, s in veerud.items())
+                  + f" FROM import_raw.\"15m_count\" WHERE aeg >= '{algus}' GROUP BY id, kanal, aeg ORDER BY id, kanal, aeg",
+                  dtype={"id": str, **dict.fromkeys(list(veerud)[1:], "float32")}, parse_dates=["ts"])    # v jääb täpseks
 
 
 def ilma_vigaste_kuudeta(x, cm, aeg="ts"):
@@ -416,6 +442,36 @@ def ilma_vigaste_kuudeta(x, cm, aeg="ts"):
     halb = cm.loc[cm["maht_kahtlane"], ["id", "kuu"]]
     halb = pd.MultiIndex.from_arrays([halb["id"], halb["kuu"].dt.year * 100 + halb["kuu"].dt.month])
     return x[~pd.MultiIndex.from_arrays([x["id"], x[aeg].dt.year * 100 + x[aeg].dt.month]).isin(halb)]
+
+
+def maantee_suunad(algus):
+    """Maanteeloendurite suunad ja nende 15 min loendused alates kuupäevast `algus` (13, 20).
+    Suund (site) = loendur + raja nime otspunktid (traffic.counter_channel, nt '3: Tartu - Tallinn 1' -> 'tartu - tallinn');
+    suuna rajad liidetakse ja alles jäävad veerandtunnid, kus kõik suuna rajad on olemas. Kahtlase mahuga loendur-kuud
+    on väljas (ilma_vigaste_kuudeta). Tagastab (ds, dq):
+      ds  site -> id, lahte, siht, nimi, tee_nr, tee_km, lat, lon
+      dq  site, start (veerandtunni algus), c (sõidukeid), n (radu), alla40, ks, kn (vt load_15m), paev, slot (0..95),
+          kool (õppetöö), argipaev (tööpäev, ka vaheajal), toopaev (tavaline tööpäev = mõlemad), dow (0 = esmaspäev)"""
+    chn = tabel("traffic.counter_channel", dtype={"id": str})
+    chn[["lahte", "siht"]] = pd.DataFrame([ends(x) for x in chn["channel_label"]], index=chn.index)
+    chn = chn[chn["lahte"] != ""]
+    chn["site"] = chn["id"] + " | " + chn["lahte"] + " - " + chn["siht"]
+    loc = load_locations().set_index("id").rename(columns={"latitude": "lat", "longitude": "lon"})
+    ds = chn.groupby("site").agg(id=("id", "first"), lahte=("lahte", "first"), siht=("siht", "first"))
+    ds = ds.join(loc[["nimi", "tee_nr", "tee_km", "lat", "lon"]], on="id")
+    m = ilma_vigaste_kuudeta(load_15m(), counter_month(load_daily()))
+    m = m[m["ts"] >= algus].merge(chn[["id", "kanal", "site"]], on=["id", "kanal"])
+    dq = (m.groupby(["site", "ts"]).agg(c=("v", "sum"), n=("v", "size"), alla40=("alla40", "sum"), ks=("ks", "sum"), kn=("kn", "sum"))
+          .reset_index().rename(columns={"ts": "start"}))
+    dq = dq[dq["n"] == dq.groupby("site")["n"].transform("max")]          # ainult veerandtunnid, kus kõik suuna rajad on olemas
+    dq["paev"] = dq["start"].dt.normalize()
+    dq["slot"] = dq["start"].dt.hour * 4 + dq["start"].dt.minute // 15
+    kal = day_calendar(dq["paev"]).set_index("paev")
+    dq["kool"] = dq["paev"].map(kal["vaheaeg"]) == "kool"
+    dq["argipaev"] = dq["paev"].map(kal["paevatyyp"]) == "tööpäev"
+    dq["toopaev"] = dq["kool"] & dq["argipaev"]
+    dq["dow"] = dq["paev"].dt.dayofweek
+    return ds, dq
 
 
 def km(lat1, lon1, lat2, lon2):
@@ -858,11 +914,13 @@ def ummikumask(labilase, taistase, algus=0.8, pusib=0.75, auk=2, kiirus=None, ka
     return mask
 
 
-def shift_peak(v, start, share, shift, mode, per_hour=4):
-    """Nihuta osa `share` tipptunni liiklusest `shift` pilu võrra.
+def shift_peak(v, start, share, shift, mode, per_hour=4, pikkus=None):
+    """Nihuta osa `share` tipptunni liiklusest `shift` pilu võrra. pikkus = nihutatavate pilude arv alates `start`
+    (vaikimisi üks tund; 06_2: kogu tipuaeg).
     mode: "varem", "hiljem", "mõlemad" (pooleks +-shift) või "ühtlane" (laiali vahemikku +-shift)."""
     v = np.asarray(v, dtype=float).copy()
-    w = np.arange(start, start + per_hour)
+    w = np.arange(start, start + (pikkus or per_hour))
+    assert w[0] - shift >= 0 and w[-1] + shift < len(v), "nihe läheb päevast välja"
     moved = v[w] * share
     v[w] -= moved
     if mode == "varem":
@@ -889,6 +947,389 @@ def spread_reduction(v, window, share, shift_min, mode="mõlemad", per_hour=4):
     hi = min(window[1] + 2, 24 - 1)
     _, new_vol = peak_hour(new, (lo, hi), per_hour)
     return (1 - new_vol / vol) * 100
+
+
+# --- Stsenaariumid: kui palju autosid peab tipust ära minema (40_0 ... 40_3) -----------------------------------------
+# Kaks mudelit ajaloolistele 15 min profiilidele: A = foori viivitus (HCM valem) -> kiirus ristmiku ees oleval lõigul;
+# B = ummikuosa (täis või seisakus radade osa) logija nädala seose järgi. Mõlema skaala jaoks on päevast päeva kõikumine.
+STS_ALGUS = "2025-09-01"              # ajaloolised tavalised tööpäevad alates (kuni T09 andmete lõpuni)
+STS_QREF = "2026-09-01"               # B: T09 tavaline tipptund 2026. a sügisest (logija nädalaga sama hooaeg)
+LOIK_M, V_VABA = 500, 50              # A: ristmiku ees olev lõik (m) ja vaba kiirus (km/h)
+HCM_T, HCM_K = 0.25, 0.5              # A: HCM valemi periood (h, = 15 min pilu) ja kindla tsükliga foori tegur k
+TSYKKEL_VAIKE, GC_VAIKE, S_VAIKE = 90, 0.28, 1818     # A: kui ristmikul mõõtmist pole (09, 33 linna mediaanid)
+LOGIJA_NADAL = pd.to_datetime(["2026-10-16", "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"])
+STS_AKNAD = {"hommik": AM_WINDOW, "ohtu": PM_WINDOW}  # halvima tunni algus nagu tipptunnil
+STS_MIN_VOIT = 1.0                    # märgatav võit vähemalt 1% (kiirus) või 1 protsendipunkt (ummikuosa)
+
+
+def hcm_viivitus(X, tsykkel, gC, c_rada):
+    """Foori keskmine viivitus sõiduki kohta (s), HCM 2010 valem ilma algjärjekorrata (I = 1):
+      d1 = 0.5 C (1 - g/C)^2 / (1 - min(X, 1) g/C)                ühtlane viivitus (ootamine punase tule ajal)
+      d2 = 900 T [(X - 1) + sqrt((X - 1)^2 + 8 k X / (c T))]       juhuslik ja üleküllastuse viivitus
+    X = koormusaste (voog / läbilaskevõime), C = tsükli pikkus (s), c = raja läbilaskevõime (sõid/h), T = HCM_T."""
+    X = np.asarray(X, dtype=float)
+    d1 = 0.5 * tsykkel * (1 - gC) ** 2 / (1 - np.minimum(X, 1) * gC)
+    d2 = 900 * HCM_T * ((X - 1) + np.sqrt((X - 1) ** 2 + 8 * HCM_K * X / (c_rada * HCM_T)))
+    return d1 + d2
+
+
+def kiirus_viivitusest(d):
+    """Keskmine kiirus (km/h) LOIK_M pikkusel lõigul, kui vaba kiirusega sõidule lisandub viivitus d (s)."""
+    return 3.6 * LOIK_M / (LOIK_M / (V_VABA / 3.6) + np.asarray(d, dtype=float))
+
+
+def pav(x, y, kasvav=True):
+    """Monotoonne regressioon (pool-adjacent-violators): x järgi mittekahanev (kasvav=False: mittekasvav) y.
+    Tagastab sõlmed (xk, yk): iga ploki x-ide keskmine ja y keskmine, xk kasvavas järjekorras (np.interp jaoks)."""
+    x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+    ok = np.isfinite(x) & np.isfinite(y)
+    j = np.argsort(x[ok], kind="stable")
+    xs, ys = x[ok][j], y[ok][j] * (1 if kasvav else -1)
+    plokid = []                                     # [y summa, arv, esimene, viimane]
+    for i, v in enumerate(ys):
+        plokid.append([v, 1, i, i])
+        while len(plokid) > 1 and plokid[-2][0] / plokid[-2][1] > plokid[-1][0] / plokid[-1][1]:
+            s, n, _, b = plokid.pop()
+            plokid[-1][0] += s
+            plokid[-1][1] += n
+            plokid[-1][3] = b
+    xk = np.array([xs[a:b + 1].mean() for _, _, a, b in plokid])
+    yk = np.array([s / n for s, n, _, _ in plokid]) * (1 if kasvav else -1)
+    return xk, yk
+
+
+def tooaeva_profiilid(algus=STS_ALGUS, min_pilu=88):
+    """Tavaliste tööpäevade (E-R, õppetöö, mitte püha ega lühendatud päev) ristmike 15 min profiilid alates `algus`.
+    Tagastab (ix, V): ix = DataFrame mp_id, paev (rida = ristmiku päev); V = massiiv (ridu, 96), sõidukeid 15 min.
+    Päev jääb välja, kui andmeid on alla min_pilu pilu; lühemad augud täidetakse lineaarselt."""
+    t, d = load_tallinn()
+    d = d[d["kehtiv"] & (d["paevatyyp"] == "tööpäev") & (d["vaheaeg"] == "kool") & (d["paev"] >= algus)]
+    t = t.merge(d[["mp_id", "paev"]], on=["mp_id", "paev"])
+    w = t.groupby(["mp_id", "paev", "slot"])["v"].sum(min_count=1).unstack("slot").reindex(columns=range(96))
+    w = w[w.notna().sum(axis=1) >= min_pilu]
+    V = w.T.interpolate(limit_direction="both").T.to_numpy()
+    return w.index.to_frame(index=False), V
+
+
+def tunni_keskmine(M, W=None, per_hour=4):
+    """Liikuv tunnikeskmine iga rea kohta: veerg s = pilude s ... s+3 keskmine (W-ga kaalutud); kuju (ridu, 93)."""
+    W = np.ones_like(M) if W is None else W
+    a = np.cumsum(np.pad(M * W, ((0, 0), (1, 0))), axis=1)
+    b = np.cumsum(np.pad(W, ((0, 0), (1, 0))), axis=1)
+    with np.errstate(invalid="ignore", divide="ignore"):          # tühi tund (öösel 0 sõidukit) -> NaN
+        return (a[:, per_hour:] - a[:, :-per_hour]) / (b[:, per_hour:] - b[:, :-per_hour])
+
+
+def halvim_tund(M, aken, W=None, per_hour=4):
+    """Halvima tunni väärtus igas reas: tunnikeskmise (W-ga kaalutud) suurim väärtus, tunni algus aknas `aken` (h)."""
+    return tunni_keskmine(M, W, per_hour)[:, aken[0] * per_hour:aken[1] * per_hour].max(axis=1)
+
+
+def stsenaarium(V, tyyp, p, aken=None, nihe_min=0, per_hour=4):
+    """Profiilid V (ridu, 96) pärast muutust:
+      tyyp="yt"     osa p kõigist autodest kaob kogu päevaks (läheb ühistransporti): V (1 - p)
+      tyyp="nihe"   osa p iga rea tipptunni (suurim liikuv tunnisumma, algus aknas `aken`) autodest nihkub: pool
+                    nihe_min võrra varem, pool hiljem (nagu shift_peak "mõlemad"); muu liiklus jääb paigale."""
+    if tyyp == "yt":
+        return V * (1 - p)
+    k = int(round(nihe_min * per_hour / 60))
+    S = tunni_keskmine(V, per_hour=per_hour)[:, aken[0] * per_hour:aken[1] * per_hour]
+    s = aken[0] * per_hour + np.argmax(S, axis=1)
+    assert (s - k).min() >= 0 and (s + per_hour - 1 + k).max() < V.shape[1], "nihe läheb päevast välja"
+    r, w = np.arange(len(V))[:, None], s[:, None] + np.arange(per_hour)
+    V2 = V.copy()
+    m = V2[r, w] * p
+    V2[r, w] -= m
+    V2[r, w - k] += m / 2
+    V2[r, w + k] += m / 2
+    return V2
+
+
+def mudeli_parameetrid():
+    """Mudelite A ja B parameetrid ristmike kaupa varasemate skriptide tabelitest (kaust valjund/):
+      A  C = eeldatav piir, sõid/h (27_ristmikud_piir.csv); tsükkel = kindla tsükliga manöövrite hommiku- ja õhtutsükli
+         mediaan (09_manoovrid.csv); g/C ja küllastusvoog s rajal = ristmiku manöövrite mediaanid
+         (33_kullastusvoog_eeldus.csv); puuduvad -> TSYKKEL_VAIKE, GC_VAIKE, S_VAIKE. Raja läbilaskevõime c = s g/C.
+      B  logija nädala tööpäevade (LOGIJA_NADAL) 15 min pilud kell 06-19 (24_koormus_5min.csv, 3 x 5 min): voog
+         x = sõidukeid 15 min / (Qref / 4), Qref = tavaline tipptund (suurim liikuv tunnisumma, päevade mediaan);
+         ummikuosa y = täis ja seisakus kanalite osa ristmiku täistasemest (tais_pct + seisak_pct, pilu keskmine), %.
+         Seos y(x) = kasvav monotoonne regressioon (pav). Kaal = kanalite täistasemete summa (24_kanalid.csv).
+    Tagastab (pa, sb): pa = DataFrame (indeks mp_id) kood, C, olek, tsykkel, gC, s, c_rada; sb = dict mp_id ->
+    dict(xk, yk, qref, kaal, punkte)."""
+    o = DATA_DIR / "valjund"
+    pa = pd.read_csv(o / "27_ristmikud_piir.csv").set_index("mp_id")[["kood", "eeldatav", "olek"]]
+    pa = pa.rename(columns={"eeldatav": "C"})
+    m9 = pd.read_csv(o / "09_manoovrid.csv")
+    m9 = m9[m9["meetod"] == "kindel"]
+    tsykkel = pd.concat([m9[["mp", "hommik_T"]].set_axis(["mp", "T"], axis=1),
+                         m9[["mp", "õhtu_T"]].set_axis(["mp", "T"], axis=1)]).groupby("mp")["T"].median()
+    m33 = pd.read_csv(o / "33_kullastusvoog_eeldus.csv").groupby("mp")[["g_C", "kullastusvoog_soid_h_rajal"]].median()
+    pa["tsykkel"] = pa["kood"].map(tsykkel).fillna(TSYKKEL_VAIKE)
+    pa["gC"] = pa["kood"].map(m33["g_C"]).fillna(GC_VAIKE)
+    pa["s"] = pa["kood"].map(m33["kullastusvoog_soid_h_rajal"]).fillna(S_VAIKE)
+    pa["c_rada"] = pa["s"] * pa["gC"]
+
+    z = pd.read_csv(o / "24_soojus_ajatelg" / "24_koormus_5min.csv", parse_dates=["paev"])
+    z = z[z["paev"].isin(LOGIJA_NADAL)]
+    z["slot"] = z["kell"].str[:2].astype(int) * 4 + z["kell"].str[3:5].astype(int) // 15
+    z["y"] = z["tais_pct"] + z["seisak_pct"]
+    q = z.groupby(["kood", "paev", "slot"]).agg(q=("soidukeid", "sum"), y=("y", "mean"), n=("y", "count")).reset_index()
+    q = q[q["n"] == 3]
+    kaal = pd.read_csv(o / "24_soojus_ajatelg" / "24_kanalid.csv").groupby("kood")["taistase_soid_h"].sum()
+    mp_id = pa.reset_index().set_index("kood")["mp_id"]
+    sb = {}
+    for kood, g in q.groupby("kood"):
+        if kood not in mp_id.index or kood not in kaal.index:
+            continue
+        w = g.pivot(index="paev", columns="slot", values="q").reindex(columns=range(24, 76))
+        qref = np.nanmedian(np.nanmax(w.T.rolling(4).sum().T.to_numpy(), axis=1))
+        xk, yk = pav(g["q"] / (qref / 4), g["y"])
+        sb[int(mp_id[kood])] = dict(xk=xk, yk=yk, qref=qref, kaal=float(kaal[kood]), punkte=len(g))
+    return pa, sb
+
+
+def tavaline_tipp(ix, V, algus=STS_QREF):
+    """Ristmike tavaline tipptund (sõid/h) alates `algus`: iga päeva suurim liikuv tunnisumma (algus 06:00-18:45),
+    päevade mediaan. Tagastab dict mp_id -> sõid/h (mudeli B voo ühik)."""
+    r = (ix["paev"] >= algus).to_numpy()
+    tipp = 4 * tunni_keskmine(V[r])[:, 24:76].max(axis=1)
+    return pd.Series(tipp).groupby(ix.loc[r, "mp_id"].to_numpy()).median().to_dict()
+
+
+def viivitus(ix, V, pa):
+    """Mudel A: foori viivitus (s/sõiduk) igas pilus, koormusaste X = 4 x 15 min voog / C."""
+    p = pa.loc[ix["mp_id"]]
+    col = lambda c: p[c].to_numpy()[:, None]
+    return hcm_viivitus(4 * V / col("C"), col("tsykkel"), col("gC"), col("c_rada"))
+
+
+def ummikuosa(ix, V, sb, qref):
+    """Mudel B: ummikuosa (%) igas pilus, y = y_j(V / (qref_j / 4)) ristmiku j seose järgi; qref = ristmiku T09
+    tavaline tipptund (tavaline_tipp). Ristmikud, millel seost pole, jäävad NaN."""
+    Y = np.full(V.shape, np.nan)
+    for mp, rows in ix.groupby("mp_id").indices.items():
+        if mp in sb and mp in qref:
+            Y[rows] = np.interp(V[rows] / (qref[mp] / 4), sb[mp]["xk"], sb[mp]["yk"])
+    return Y
+
+
+def sts_andmed(paneel_osa=0.85):
+    """40_* ühised andmed: mudelite parameetrid, ajaloolised profiilid (ainult ristmikud, millel on 27 piir) ja linna
+    kindel valim (ristmikud, millel on mõlemad mudelid ja vähemalt paneel_osa päevadest). Tagastab dict:
+      pa, sb, ix, V, qref   mudeli_parameetrid, tooaeva_profiilid, tavaline_tipp
+      paneel, iv            linna valimi ristmikud ja nende read (bool)
+      kood, paevad, kaal    valimi rea päeva number, päevad, B kaal (täistase) valimi ridadele
+      taisi                 linna päevad, kus on vähemalt 90% valimist (bool päevade kohta)"""
+    pa, sb = mudeli_parameetrid()
+    ix, V = tooaeva_profiilid()
+    hoia = ix["mp_id"].isin(pa.index).to_numpy()
+    ix, V = ix[hoia].reset_index(drop=True), V[hoia]
+    osa = ix.groupby("mp_id").size() / ix["paev"].nunique()
+    paneel = [m for m in osa[osa >= paneel_osa].index if m in sb]
+    iv = ix["mp_id"].isin(paneel).to_numpy()
+    kood, paevad = pd.factorize(ix.loc[iv, "paev"])
+    kaal = ix.loc[iv, "mp_id"].map({m: sb[m]["kaal"] for m in paneel}).to_numpy()[:, None]
+    taisi = np.bincount(kood, minlength=len(paevad)) >= 0.9 * len(paneel)
+    return dict(pa=pa, sb=sb, ix=ix, V=V, qref=tavaline_tipp(ix, V), paneel=paneel, iv=iv, kood=kood,
+                paevad=pd.DatetimeIndex(paevad), kaal=kaal, taisi=taisi)
+
+
+def sts_naitajad(a, Vx, aken):
+    """Mudelite A ja B näitajad profiilidele Vx (read nagu a["ix"]; a = sts_andmed()):
+      A, B                  ristmiku päeva halvim tund: viivitus (s/sõiduk, sõidukitega kaalutud), ummikuosa (%)
+      linnA, linnB          linna päeva halvim tund (kindel valim; A sõidukitega, B täistasemega kaalutud)
+      paevA, paevB          ristmiku päev kokku: viivitus x sõidukid (sõiduk-s), ummikuosa pilude summa
+      linn_paevA, linn_paevB  sama linna kohta (valimi summa)
+    Linna väärtused on päevade kaupa (a["paevad"])."""
+    D, Y = viivitus(a["ix"], Vx, a["pa"]), ummikuosa(a["ix"], Vx, a["sb"], a["qref"])
+    s = lambda M: pd.DataFrame(M).groupby(a["kood"]).sum().to_numpy()
+    Vi, VDi, YKi = Vx[a["iv"]], (Vx * D)[a["iv"]], Y[a["iv"]] * a["kaal"]
+    Wl, K = s(Vi), s(np.isfinite(Y[a["iv"]]) * a["kaal"])
+    return dict(A=halvim_tund(D, aken, Vx), B=halvim_tund(Y, aken), linnA=halvim_tund(s(VDi) / Wl, aken, Wl),
+                linnB=halvim_tund(s(YKi) / K, aken), paevA=(Vx * D).sum(axis=1), paevB=Y.sum(axis=1),
+                linn_paevA=s(VDi).sum(axis=1), linn_paevB=(s(YKi) / K).sum(axis=1))
+
+
+def sts_voit(mudel, alg, uus):
+    """Võit: A = kiiruse kasv (%) viivitustest alg -> uus; B = ummikuosa vähenemine (protsendipunkti)."""
+    if mudel == "A":
+        return 100 * (kiirus_viivitusest(uus) / kiirus_viivitusest(alg) - 1)
+    return alg - uus
+
+
+def sts_nihete_voit(a, p, aken, nihked):
+    """Nihke pikkuse mõju (40_1, 40_3): osa p iga päeva tipptunni autodest nihkub pool varem, pool hiljem iga nihke
+    (min) võrra; võrdluseks samad autod kaovad (yt, nihe_min = 0). Tagastab (linn, rist):
+      linn  mudel, stsenaarium, nihe_min, tipu_voit (halvim tund, sts_voit, linna päevade mediaan), paeva_voit (kogu
+            päeva viivituse (A) või ummikuosa summa (B) vähenemine, %, päevade mediaan; miinus = päev läks halvemaks)
+      rist  sama ristmike kaupa (mp_id, ristmiku päevade mediaan)"""
+    alg = sts_naitajad(a, a["V"], aken)
+    t, mp_id = a["taisi"], a["ix"]["mp_id"].to_numpy()
+    pv = lambda x0, x1: 100 * (1 - x1 / np.where(x0 > 0, x0, np.nan))
+    linn, rist = [], []
+    for sk, nihe in [("yt", 0)] + [("nihe", n) for n in nihked]:
+        uus = sts_naitajad(a, stsenaarium(a["V"], sk, p, aken, nihe), aken)
+        for m in "AB":
+            linn.append(dict(mudel=m, stsenaarium=sk, nihe_min=nihe,
+                             tipu_voit=np.nanmedian(sts_voit(m, alg[f"linn{m}"][t], uus[f"linn{m}"][t])),
+                             paeva_voit=np.nanmedian(pv(alg[f"linn_paev{m}"][t], uus[f"linn_paev{m}"][t]))))
+            g = pd.DataFrame(dict(mp_id=mp_id, tipu_voit=sts_voit(m, alg[m], uus[m]),
+                                  paeva_voit=pv(alg[f"paev{m}"], uus[f"paev{m}"])))
+            rist.append(g.groupby("mp_id").median().reset_index().assign(mudel=m, stsenaarium=sk, nihe_min=nihe))
+    return pd.DataFrame(linn), pd.concat(rist, ignore_index=True)
+
+
+def sts_osakaal(tabel):
+    """40_1 ja 40_3 nihkujate osakaal (%) tipu kaupa 40_0_murdepunkt.csv järgi: suurem mudelite A ja B linna
+    murdepunktist stsenaariumis "pool 60 min varem, pool hiljem" (siis on nihe mõlema mudeli järgi märgatav);
+    kui murdepunkti pole, 30%."""
+    z = tabel[tabel["margatav"] & (tabel["stsenaarium"] == "nihe60")].groupby(["tipp", "mudel"])["p"].min()
+    return {t: float(z.xs(t, level="tipp").reindex(["A", "B"]).fillna(30).max()) if t in z.index.get_level_values(0)
+            else 30.0 for t in STS_AKNAD}
+
+
+def paeva_mura(paev, m, parem="suurem", aken=21):
+    """Päevast päeva kõikumine: päevade väärtus m võrreldes `aken` päeva liikuva mediaaniga (tase ja aeglased muutused
+    välja, nagu 37). parem="suurem" (kiirus): kerge päev = 90. protsentiil, mura = q90 / q50 - 1 (osa);
+    parem="vaiksem" (ummikuosa): kerge päev = 10. protsentiil, mura = q50 - q10 (samas ühikus kui m)."""
+    s = pd.Series(np.asarray(m, dtype=float), index=pd.to_datetime(paev)).sort_index().dropna()
+    tase = s.rolling(aken, center=True, min_periods=7).median()
+    if parem == "suurem":
+        r = s / tase
+        return r.quantile(0.9) / r.quantile(0.5) - 1
+    r = s - tase
+    return r.quantile(0.5) - r.quantile(0.1)
+
+
+# --- Muutuva pikkusega tipuaeg (06_2, 07_2) ---------------------------------------------------------------------------
+# Tipuaeg ei ole alati 60 min: see kestab seni, kuni liiklus on sama aeglane või sama tihe kui koha tavalises tipus.
+# "Sama" = päevast päeva kõikumise piires (nagu 40_0 märgatavus). Profiilid on 15 min sammuga.
+TIPUAJA_ALA = {"hommik": (5, 12), "ohtu": (12, 21)}   # tipuaeg otsitakse sellest alast (h); serva puudutamine = servas
+TIPUAJA_AUK = 1                       # kuni 1 madalam pilu (15 min) tipuaja sees loetakse sisse (nagu 13 aeglane lõik)
+TIPUAJA_KIIRUSE_VOOG = 0.5            # kiirus loeb ainult pilus, kus voog >= pool tipu voost: vähese liiklusega aeglus
+                                      # (varahommikul pimedas, veokite suurem osa) ei ole liiklusest tingitud
+
+
+def voo_mura(paev, m, aken=21):
+    """Voo päevast päeva kõikumine suhtena (tase ja aeglased muutused välja nagu paeva_mura): päevade väärtus m jagatud
+    `aken` päeva liikuva mediaaniga; mura = 1 - q10 / q50 ehk kui palju väiksem on tavaline kerge päev (10. protsentiil)."""
+    s = pd.Series(np.asarray(m, dtype=float), index=pd.to_datetime(paev)).sort_index().dropna()
+    r = s / s.rolling(aken, center=True, min_periods=7).median()
+    return 1 - r.quantile(0.1) / r.quantile(0.5)
+
+
+def tipu_mura(paev, Q, S=None, per_hour=4):
+    """Ühe koha tipu päevast päeva kõikumine. Q (päevi, 96) = päevade 15 min vood, S = sama kujuga kiirused (km/h, NaN =
+    kiirus puudub) või None. Päeva tipp aknas STS_AKNAD[tipp]: suurim 15 min voog ja aeglaseim kiirus.
+    Tagastab dict tipp -> (mura_q, mura_s): mura_q = voo_mura, mura_s = paeva_mura(kiirus, "suurem") (NaN, kui S puudub)."""
+    out = {}
+    for tipp, (a, b) in STS_AKNAD.items():
+        with warnings.catch_warnings():            # päev ilma andmeteta aknas -> NaN
+            warnings.simplefilter("ignore", RuntimeWarning)
+            q = np.nanmax(Q[:, a * per_hour:b * per_hour], axis=1)
+            s = np.nanmin(S[:, a * per_hour:b * per_hour], axis=1) if S is not None else None
+        out[tipp] = (voo_mura(paev, q), paeva_mura(paev, s, "suurem") if s is not None else np.nan)
+    return out
+
+
+def tipuaja_lavi(v, tipp, mura_q, s=None, mura_s=np.nan, per_hour=4):
+    """Tipuaja lävendid koha tavalise päeva profiilist v (15 min voog) ja kiirusest s (km/h; None = kiirust pole).
+    Tipu pilu k = suurima vooga pilu aknas STS_AKNAD[tipp]. Pilu on tipuaja tasemel, kui
+      voog >= q = v[k] (1 - mura_q)            sama tihe kui tavaline tipp (kerge päeva tipu tasemel), või
+      voog >= q_s = TIPUAJA_KIIRUSE_VOOG v[k] ja
+      kiirus <= s = min(s[ks] (1 + mura_s),    sama aeglane kui tavaline tipp (ks = aeglaseim pilu aknas nende pilude
+                                               seas, kus voog >= q_s) ja ühtlasi
+                        tavakiirus (1 - mura_s))  märgatavalt aeglasem kui tavaliselt (tavakiirus = pilude mediaan kell
+                                               06-20). Kiiruse tingimus kehtib ainult siis, kui tipp ise on märgatavalt
+                                               aeglasem: s[ks] <= tavakiirus (1 - mura_s); muidu (nt vaba vooga
+                                               maanteel) loeb ainult voog.
+    Tagastab dict(k, q, q_s, ks, s, s_tava, s_tipp); ks ja s on None, kui kiiruse tingimust pole."""
+    a, b = (h * per_hour for h in STS_AKNAD[tipp])
+    v = np.asarray(v, dtype=float)
+    k = a + int(np.nanargmax(v[a:b]))
+    out = dict(k=k, q=v[k] * (1 - mura_q), q_s=v[k] * TIPUAJA_KIIRUSE_VOOG, ks=None, s=None, s_tava=np.nan,
+               s_tipp=np.nan)
+    s = None if s is None else np.asarray(s, dtype=float)
+    sw = np.where(v[a:b] >= out["q_s"], s[a:b], np.nan) if s is not None else None
+    if s is not None and np.isfinite(mura_s) and np.isfinite(sw).any():
+        ks = a + int(np.nanargmin(sw))
+        out.update(s_tava=float(np.nanmedian(s[6 * per_hour:20 * per_hour])), s_tipp=float(s[ks]))
+        if s[ks] <= out["s_tava"] * (1 - mura_s):
+            out.update(ks=ks, s=min(s[ks] * (1 + mura_s), out["s_tava"] * (1 - mura_s)))
+    return out
+
+
+def tipuaja_mask(v, lavi, s=None):
+    """Pilud, kus liiklus on tipuaja tasemel: voog >= lavi["q"] või (kiiruse tingimusega) voog >= lavi["q_s"] ja
+    kiirus <= lavi["s"]."""
+    v = np.asarray(v, dtype=float)
+    m = v >= lavi["q"]
+    if lavi["s"] is not None and s is not None:
+        m |= (np.nan_to_num(np.asarray(s, dtype=float), nan=np.inf) <= lavi["s"]) & (v >= lavi["q_s"])
+    return m
+
+
+def tipuaeg(v, tipp, lavi, s=None, per_hour=4):
+    """Muutuva pikkusega tipuaeg: tipuaja tasemel pilude (tipuaja_mask) lõigud otsingualas TIPUAJA_ALA[tipp] (kuni
+    TIPUAJA_AUK madalamat pilu lõigu sees loetakse sisse); tipuaeg = lõik, kus on tipu pilu k (suurim voog). Kiiruse
+    tingimus pikendab tipuaega ainult siis, kui aeglane aeg on tipuga kokku. Tagastab dict:
+      a, b        tipuaeg = pilud [a, b); kui k ise pole tipuaja tasemel (nt pärast nihet), a = b = k
+      kestus_min  tipuaja pikkus, min
+      minuteid    kõik tipuaja tasemel minutid otsingualas (ka teistes lõikudes, madalamaid vahepilusid sisse
+                  lugemata; hajutamise ja koolivaheaja mõõt)
+      servas      tipuaeg puudutab otsinguala serva (selget algust või lõppu pole)"""
+    lo, hi = (h * per_hour for h in TIPUAJA_ALA[tipp])
+    m = tipuaja_mask(v, lavi, s)[lo:hi]
+    loik = [(a + lo, b + lo) for a, b in loigud(m, TIPUAJA_AUK)]
+    a, b = next(((a, b) for a, b in loik if a <= lavi["k"] < b), (lavi["k"], lavi["k"]))
+    return dict(a=a, b=b, kestus_min=(b - a) * 60 // per_hour, minuteid=int(m.sum()) * 60 // per_hour,
+                servas=b > a and (a == lo or b == hi))
+
+
+def tipuaja_naitajad(v, lavid, s=None, per_hour=4):
+    """Tipuaja näitajad mõlema tipu kohta (nagu peak_metrics), lavid = dict tipp -> tipuaja_lavi:
+      ooopaev; {hommik,ohtu}_ algus, algus_h, lopp, lopp_h, kestus_min, minuteid, servas; soidukeid (tipuajal kokku),
+      osakaal_% (ööpäevast), soid_h (keskmine voog tipuajal, sõid/h), tipp15_soid_h (suurim 15 min x 4); kestus_voog_min
+      (tipuaeg ainult voo tingimusega); kiirus_tingimus (kas kiiruse tingimus kehtib), lavi_q (sõid/15 min), lavi_kmh,
+      tavakiirus_kmh, tipu_kiirus_kmh."""
+    v = np.asarray(v, dtype=float)
+    out = {"ooopaev": float(np.nansum(v))}
+    for tipp, lv in lavid.items():
+        t = tipuaeg(v, tipp, lv, s, per_hour)
+        tv = tipuaeg(v, tipp, {**lv, "ks": None, "s": None}, None, per_hour)
+        n = float(v[t["a"]:t["b"]].sum())
+        out.update({f"{tipp}_algus": slot_label(t["a"], per_hour), f"{tipp}_algus_h": t["a"] / per_hour,
+                    f"{tipp}_lopp": slot_label(t["b"], per_hour), f"{tipp}_lopp_h": t["b"] / per_hour,
+                    f"{tipp}_kestus_min": t["kestus_min"], f"{tipp}_minuteid": t["minuteid"],
+                    f"{tipp}_servas": t["servas"], f"{tipp}_soidukeid": n, f"{tipp}_osakaal_%": n / out["ooopaev"] * 100,
+                    f"{tipp}_soid_h": n / max(t["b"] - t["a"], 1) * per_hour,
+                    f"{tipp}_tipp15_soid_h": v[lv["k"]] * per_hour, f"{tipp}_kestus_voog_min": tv["kestus_min"],
+                    f"{tipp}_kiirus_tingimus": lv["s"] is not None, f"{tipp}_lavi_q": lv["q"],
+                    f"{tipp}_lavi_kmh": lv["s"], f"{tipp}_tavakiirus_kmh": lv["s_tava"],
+                    f"{tipp}_tipu_kiirus_kmh": lv["s_tipp"]})
+    return out
+
+
+def ristmike_kiirus(mp_ids, V, pa):
+    """Mudel A kiirus (km/h) ristmike profiilidele V (read = mp_ids); ristmik ilma parameetriteta (pa) -> NaN rida."""
+    mp_ids = np.asarray(mp_ids)
+    S = np.full(np.shape(V), np.nan)
+    ok = np.isin(mp_ids, pa.index)
+    if ok.any():
+        S[ok] = kiirus_viivitusest(viivitus(pd.DataFrame(dict(mp_id=mp_ids[ok])), np.asarray(V, dtype=float)[ok], pa))
+    return S
+
+
+def ristmike_tipumura(pa):
+    """Ristmike tipu päevast päeva kõikumine (tipu_mura) kõigi tavaliste tööpäevade järgi (tooaeva_profiilid alates
+    andmete algusest), kiirus mudelist A (ristmike_kiirus). Tagastab DataFrame (indeks mp_id, tipp): mura_q, mura_s, paevi."""
+    ix, V = tooaeva_profiilid(algus="2000-01-01")
+    S = ristmike_kiirus(ix["mp_id"], V, pa)
+    rows = []
+    for mp, r in ix.groupby("mp_id").indices.items():
+        for tipp, (mq, ms) in tipu_mura(ix["paev"].iloc[r], V[r], S[r]).items():
+            rows.append(dict(mp_id=mp, tipp=tipp, mura_q=mq, mura_s=ms, paevi=len(r)))
+    return pd.DataFrame(rows).set_index(["mp_id", "tipp"])
 
 
 def ratio_index(df, value, period="kuu", site="id", base_year=TALLINN_BASE_YEAR, by=None, min_sites=3):
@@ -961,6 +1402,7 @@ def _fetch_tile(src, z, x, y, timeout=12):
     return img
 
 
+@functools.lru_cache(maxsize=8)          # sama kaardiala mitmel paneelil (20): pilt pannakse kokku üks kord
 def satellite_image(lon0, lat0, lon1, lat1, target_px=2200, max_tiles=160):
     """Liidab ala (lon0, lat0) ... (lon1, lat1) plaadid üheks pildiks.
 
@@ -1062,3 +1504,151 @@ def _scalebar(ax, lat):
     ax.plot([bx, bx + length], [by, by], color="white", lw=3, solid_capstyle="butt", zorder=11)
     ax.text(bx + length / 2, by + 0.015 * (y1 - y0), f"{km} km", ha="center", va="bottom",
             fontsize=8, zorder=12, path_effects=[pe.withStroke(linewidth=2.5, foreground="white")])
+
+
+# ==============================================================================
+# Ajastuskaardid (07, 21): värv = kellaaeg, suurus = ööpäevane liiklus
+# ==============================================================================
+def bbox(df, pad=0.06):
+    """Punktide (veerud lon, lat) ümbris (lon0, lat0, lon1, lat1), igas servas lisatud `pad` osa ulatusest."""
+    lo0, lo1, la0, la1 = df.lon.min(), df.lon.max(), df.lat.min(), df.lat.max()
+    dx, dy = (lo1 - lo0) * pad, (la1 - la0) * pad
+    return lo0 - dx, la0 - dy, lo1 + dx, la1 + dy
+
+
+HALO = [pe.withStroke(linewidth=2.2, foreground="white")]
+
+
+def ramp(name):
+    """Ühe tooniga skaala heledast tumedani, kõige heledam osa välja (satelliidil nähtav)."""
+    return LinearSegmentedColormap.from_list(name + "_t", plt.get_cmap(name)(np.linspace(0.3, 1, 256)))
+
+
+def map_extent(df, pad=0.06):
+    """Kaardi ulatus (lon0, lat0, lon1, lat1): punktid + äär, all lisaruum mõõtkavale."""
+    lon0, lat0, lon1, lat1 = bbox(df, pad)
+    return lon0, lat0 - 0.06 * (lat1 - lat0), lon1, lat1
+
+
+def hhmm(h):
+    """Kellaaeg tundides (nt 7.5) -> 'HH:MM' ('07:30')."""
+    m = int(round(h * 60))
+    return f"{m // 60:02d}:{m % 60:02d}"
+
+
+def time_ticks(vmin, vmax):
+    """Värviskaala märgid: samm 1/2/5/10/15/30 min nii, et märke oleks kuni 7."""
+    span = (vmax - vmin) * 60
+    step = next((st for st in (1, 2, 5, 10, 15, 30) if span / st <= 6), 60)
+    return np.arange(np.ceil(vmin * 60 / step) * step, vmax * 60 + 1e-6, step) / 60
+
+
+def place_labels(ax, xs, ys, texts, fontsize=6.5, order=None, obstacles=None):
+    """Lihtne siltide paigutus: iga punkti jaoks proovitakse 8 suunda ja valitakse esimene,
+    mis ei kattu juba paigutatud siltide ega markeritega (ekraanikoordinaatides).
+    obstacles = (x, y, s) massiivid: markerite asukohad ja scatter-suurused (pt^2)."""
+    fig = ax.figure
+    fig.canvas.draw()
+    to_px = ax.transData.transform
+    pts = to_px(np.column_stack([xs, ys]))
+    placed = []
+    dpi_k = fig.dpi / 72
+    if obstacles is not None:
+        ox, oy, os_ = obstacles
+        for (px_, py_), sz in zip(to_px(np.column_stack([ox, oy])), os_):
+            r = np.sqrt(sz) / 2 * dpi_k * 0.9
+            placed.append((px_ - r, py_ - r, px_ + r, py_ + r))
+    offsets = [(6, 5), (6, -11), (-6, 5), (-6, -11), (9, -3), (-9, -3), (0, 9), (0, -15)]
+    idx = order if order is not None else range(len(texts))
+    for i in idx:
+        w, h = len(texts[i]) * fontsize * 0.62 * dpi_k, fontsize * 1.25 * dpi_k
+        best = None
+        for dx, dy in offsets:
+            x0 = pts[i, 0] + dx * dpi_k - (w if dx < 0 else (w / 2 if dx == 0 else 0))
+            y0 = pts[i, 1] + dy * dpi_k
+            box = (x0, y0, x0 + w, y0 + h)
+            hit = any(not (box[2] < b[0] or box[0] > b[2] or box[3] < b[1] or box[1] > b[3]) for b in placed)
+            if not hit:
+                best = (dx, dy, box)
+                break
+        if best is None:
+            best = (offsets[0][0], offsets[0][1], None)
+        dx, dy, box = best
+        if box is not None:
+            placed.append(box)
+        ha = "left" if dx > 0 else ("right" if dx < 0 else "center")
+        ax.annotate(texts[i], (xs[i], ys[i]), xytext=(dx, dy), textcoords="offset points", fontsize=fontsize,
+                    ha=ha, va="bottom", color="black", zorder=6, path_effects=HALO)
+
+
+def timing_map(df, fname, title, label_junctions, size_k, label_fs=6.5, pad=0.06, zoom_box=None,
+               zoom_label="", naitaja="keskaeg", paneelid=None):
+    """Kaardid satelliittaustal (07, 21, 22), vaikimisi kaks: hommik ja õhtu. df = kohad: tyyp (ristmik / maantee),
+    suund (maanteel sisse / välja), koht, id, lon, lat, ooopaev ja veerud {hommik,ohtu}_{naitaja}_h (kellaaeg tundides;
+    naitaja = kestus: {hommik,ohtu}_kestus_min, minutid). Värv = naitaja (keskaeg = liikluse keskaeg, algus = tipptunni
+    algus, kestus = tipuaja kestus 07_2; skaala otstes vähim ja suurim), suurus = ööpäevane liiklus
+    (ruutjuure skaalas), ruut = ristmik, ring = maantee suund (hommikul sisse-, õhtul väljasuund). zoom_box =
+    (lon0, lat0, lon1, lat1): lähivaate ala katkendliku raamina; selle sees olevaid ristmikke ei nimetata.
+    paneelid = [(veeru eesliide, maantee suund, värviskaala, pealkiri), ...] - muud kaardid (22: nädalavahetus),
+    kaks kaarti reas."""
+    lon0, lat0, lon1, lat1 = map_extent(df, pad)
+    (mx0, my0), (mx1, my1) = to_merc(lon0, lat0), to_merc(lon1, lat1)
+    ratio = (mx1 - mx0) / (my1 - my0)
+    paneelid = paneelid or [
+            ("hommik", "sisse", ramp("Blues"), {"keskaeg": "Hommik 06-10", "algus": "Hommik, tipptunni algus 06.00-09.59",
+                                                "kestus": "Hommikune tipuaeg"}[naitaja]
+             + " (maanteel: sissesõit linna)"),
+            ("ohtu", "välja", ramp("Oranges"), {"keskaeg": "Õhtu 15-19", "algus": "Õhtu, tipptunni algus 14.00-18.59",
+                                                "kestus": "Õhtune tipuaeg"}[naitaja]
+             + " (maanteel: väljasõit linnast)")]
+    veerg = (lambda name: f"{name}_kestus_min") if naitaja == "kestus" else (lambda name: f"{name}_{naitaja}_h")
+    nr = (len(paneelid) + 1) // 2
+    fig, axes = plt.subplots(nr, 2, figsize=(15, nr * 6.3 / ratio + 1.1), layout="constrained", squeeze=False)
+    attribution = None
+    for ax, (name, suund, cmap, lab) in zip(axes.flat, paneelid):
+        attribution = add_basemap(ax, lon0, lat0, lon1, lat1)
+        sub = df[(df.tyyp == "ristmik") | (df.suund == (SUUND_MAANTEE or suund))]
+        lab = f"{lab.split(' (')[0]} ({SUUND}, maanteel {SUUND_MAANTEE})" if SUUND else lab
+        vmin, vmax = sub[veerg(name)].min(), sub[veerg(name)].max()     # skaala otsad = vähim ja suurim
+        for tyyp, marker in [("maantee", "o"), ("ristmik", "s")]:
+            s2 = sub[sub.tyyp == tyyp]
+            mx, my = to_merc(s2.lon.values, s2.lat.values)
+            sc = ax.scatter(mx, my, c=s2[veerg(name)], cmap=cmap, vmin=vmin, vmax=vmax,
+                            s=np.sqrt(s2.ooopaev) * size_k, marker=marker, edgecolor="black",
+                            linewidth=0.7, zorder=5)
+        named = sub[(sub.tyyp == "maantee") | label_junctions]
+        if zoom_box is not None:
+            zx0, zy0, zx1, zy1 = zoom_box
+            inside = named.lon.between(zx0, zx1) & named.lat.between(zy0, zy1) & (named.tyyp == "ristmik")
+            named = named[~inside]
+            (rx0, ry0), (rx1, ry1) = to_merc(zx0, zy0), to_merc(zx1, zy1)
+            ax.add_patch(Rectangle((rx0, ry0), rx1 - rx0, ry1 - ry0, fill=False, ls="--", lw=1.2,
+                                   ec="black", zorder=4))
+            ax.annotate(zoom_label, (rx0, ry1), xytext=(2, 3), textcoords="offset points", fontsize=7,
+                        ha="left", va="bottom", zorder=6, path_effects=HALO)
+        lbl = named.sort_values("ooopaev", ascending=False)
+        lx, ly = to_merc(lbl.lon.values, lbl.lat.values)
+        texts = [r.koht.split(" (")[0] if r.tyyp == "maantee" else r.id for r in lbl.itertuples()]
+        ox, oy = to_merc(sub.lon.values, sub.lat.values)
+        place_labels(ax, lx, ly, texts, fontsize=label_fs,
+                     obstacles=(ox, oy, np.sqrt(sub.ooopaev.values) * size_k))
+        ax.set_title(lab, fontsize=11)
+        cb = fig.colorbar(sc, ax=ax, shrink=0.75)
+        if naitaja == "kestus":
+            otsamargid(cb, lambda x: f"{x:.0f} min")
+            cb.set_label("Tipuaja kestus (pikem = tumedam)")
+        else:
+            cb.set_ticks(time_ticks(vmin, vmax))
+            otsamargid(cb, hhmm)
+            cb.set_label({"keskaeg": "Liikluse keskaeg", "algus": "Tipptunni algus"}[naitaja] + " (hilisem = tumedam)")
+    handles = [Line2D([], [], marker="s", ls="", color=C_GRAY, markeredgecolor="black", ms=8, label="linna ristmik")]
+    if (df.tyyp == "maantee").any():
+        handles.append(Line2D([], [], marker="o", ls="", color=C_GRAY, markeredgecolor="black", ms=8,
+                              label="maantee loendur (suund)"))
+    fig.suptitle(title, x=0.01, ha="left", fontweight="bold")
+    fig.canvas.draw()                               # paigutus valmis -> legend otse kaartide alla
+    bottom = min(a.get_position().y0 for a in axes.flat)
+    fig.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, bottom - 0.005), ncol=len(handles),
+               fontsize=9)
+    save(fig, fname)
+    return attribution

@@ -35,42 +35,42 @@ ARVUTUS
     ja aastamuutustes. Suunaanalüüsis (SUUND) seda osa ei tehta, sest kütusemüügil suunda pole.
 
 VÄLJUND (kaust valjund/, suunaanalüüsis valjund/LSS või valjund/LVS)
-  06_profiilid.png
+  06_01_profiilid.png
       Näitab: iga ristmiku tüüpilise tööpäeva kuju ja tipptundide asukohta.
       Kuidas: väikesed joondiagrammid, paneel ristmiku kohta, lõpus Tallinna ümbruse maanteeloendurid (türkiis joon).
       x-telg = kellaaeg 0-24, y-telg = sõidukeid pilu (5 või 15 min) kohta. Sinine vöönd = hommikune, oranž = õhtune
       tipptund; nurgas kummagi tipptunni algus ja maht tunnis.
-  06_profiil_heatmap.png
+  06_02_profiil_heatmap.png
       Näitab: kuidas liiklus päeva peale jaotub, kõik ristmikud kõrvuti.
       Kuidas: soojuskaart; rida = ristmik (järjestatud hommikuse tipptunni alguse järgi; maanteeloendurid musta joone
       all), veerg = pilu. Värv = pilu osakaal ööpäeva liiklusest, % (tumedam = suurem; värviskaala otstes vähim ja
       suurim väärtus). Sinine ja oranž kriips = hommikune ja õhtune tipptund.
-  06_tipptunnid.png
+  06_03_tipptunnid.png
       Näitab: mis kell on tipptund igal ristmikul.
       Kuidas: rida = ristmik, x-telg = kellaaeg. Sinine riba = hommikune, oranž = õhtune tipptund (60 min), riba järel
       maht (sõidukit tunnis). Taustavöönd = kõigi ristmike summa tipptund.
-  06_nadalapaevad.png
+  06_04_nadalapaevad.png
       Näitab: nädalapäevade erinevust (õppetöö ajal, ilma pühadeta).
       Kuidas: joondiagramm, kõik ristmikud kokku; x-telg = kellaaeg, y-telg = tuhat sõidukit pilu kohta. E-N sinise
       toonid, R oranž, L hall katkendjoon, P hall punktiir.
-  06_koolivaheajad.png
+  06_05_koolivaheajad.png
       Näitab: tööpäeva profiili õppetöö, lühikese koolivaheaja ja suvevaheaja ajal.
       Kuidas: joondiagramm, kõik ristmikud kokku; sinine = õppetöö, oranž = lühike vaheaeg, türkiis = suvi.
-  06_koolivaheajad_ristmikud.png
+  06_06_koolivaheajad_ristmikud.png
       Näitab: kui palju liiklus lühikese koolivaheaja ajal igal ristmikul väheneb.
       Kuidas: punktdiagramm; rida = ristmik, x-telg = muutus, % (vs 2 nädalat enne ja pärast; vaheaegade keskmine).
       Sinine punkt = hommikune tipptund, oranž = õhtune tipptund, hall kriips = ööpäev.
-  06_hajutamine.png
+  06_07_hajutamine.png
       Näitab: kui palju väheneb tipptunni maht, kui osa sõitudest nihkub.
       Kuidas: 2 x 2 paneeli (read: nihkujad jaotuvad ühtlaselt vahemikku +-Δ / pooleks täpselt +-Δ; veerud: hommik,
       õhtu). x-telg = tipptunnist nihkuvate sõidukite osakaal, %, y-telg = tipptunni mahu vähenemine, %. Jooned Δ = 15
       (türkiis), 30 (sinine) ja 60 min (oranž): ristmike mediaan, vöönd = kvartiilid. Katkendjoon "piir, kui liiklus
       +-1 h ühtlane" = ristmike teoreetilise hajutamise potentsiaali mediaan ehk suurim võimalik vähenemine.
-  06_hajutamine_naide.png
+  06_08_hajutamine_naide.png
       Näitab: hajutamist suurima hommikuse tipuga ristmiku näitel.
       Kuidas: joondiagramm kell 5-11; tume joon = praegune profiil, sinine = 20% tipptunni sõitudest jaotub +-30 min,
       oranž = +-60 min; hall vöönd = praegune tipptund. Legendis uus tipptunni maht ja vähenemine.
-  06_kutus_harju.png
+  06_09_kutus_harju.png
       Näitab: ristmike liikluse ja Harjumaa kütusemüügi käiku kuude kaupa.
       Kuidas: joondiagramm; y-telg = indeks (2025 = 100). Tume = ristmike liiklusindeks, oranž = kütus kokku, sinine
       katkendjoon = bensiin, türkiis katkendjoon = diisel. Pealkirjas taseme ja kuumuutuste r.
@@ -187,7 +187,7 @@ hw_txt = f" + {len(hprof)} maanteeloendurit (türkiis; E-R sept-mai)" if len(hpr
 fig.suptitle(f"Tüüpiline tööpäev õppetöö ajal, {n} ristmikku{hw_txt} (sinine = hommikune, oranž = õhtune "
              f"tipptund)", x=0.01, ha="left", fontweight="bold")
 fig.tight_layout(rect=(0, 0, 1, 0.985))
-save(fig, "06_profiilid")
+save(fig, "06_01_profiilid")
 
 # 1b) heatmap: osakaal ööpäevast, järjestatud hommikuse tipu järgi; maanteed eraldi plokis all
 hm_order = order + hw_order
@@ -212,7 +212,7 @@ ax.set_xlabel("Kellaaeg")
 ax.set_ylabel("")
 ax.set_title(f"Liikluse jaotus päeva jooksul (tööpäev, õppetöö; {MIN} min); jooned = tipptunnid"
              + ("; all maanteeloendurid (andmed 15 min / 1 h)" if hw_order else ""))
-save(fig, "06_profiil_heatmap")
+save(fig, "06_02_profiil_heatmap")
 
 # 1c) tipptunni ajastus: kus ja millal
 p2 = pm.set_index("mp_id").loc[hm_order[::-1]]          # alt üles: maanteed, siis ristmikud
@@ -235,7 +235,7 @@ ax.set_xlabel(f"Kellaaeg (riba = tipptund, {MIN} min samm; number = sõidukit tu
 ax.set_ylim(-0.7, len(p2) - 0.3)
 ax.set_title(f"Hommikune ja õhtune tipptund ({n} ristmikku" + (f", all {len(hw_order)} maanteeloendurit)"
                                                               if hw_order else ")"))
-save(fig, "06_tipptunnid")
+save(fig, "06_03_tipptunnid")
 
 # --- 2) Nädalapäevad ------------------------------------------------------------------------------
 term = t["vaheaeg"] == "kool"
@@ -259,7 +259,7 @@ ax.set_xlabel("Kellaaeg")
 ax.set_ylabel(f"Tuhat sõidukit {MIN} min kohta (kõik ristmikud)")
 ax.set_title("Nädalapäevade profiilid õppetöö ajal")
 ax.legend(ncol=7, loc="upper left", fontsize=9)
-save(fig, "06_nadalapaevad")
+save(fig, "06_04_nadalapaevad")
 dow_rows = [dict(paev=DN[d], **peak_metrics(by_dow.loc[d].values, per_hour=PH)) for d in range(7)]
 save_table(pd.DataFrame(dow_rows), "06_nadalapaevad")
 
@@ -304,7 +304,7 @@ ax.set_xlabel("Kellaaeg")
 ax.set_ylabel(f"Tuhat sõidukit {MIN} min kohta ({n} ristmikku kokku)")
 ax.set_title("Tööpäeva profiil õppetöö ja koolivaheaegade ajal")
 ax.legend(loc="upper left", fontsize=9)
-save(fig, "06_koolivaheajad")
+save(fig, "06_05_koolivaheajad")
 
 pj = per_j.loc[[m for m in order if m in per_j.index]][::-1]
 fig, ax = plt.subplots(figsize=(8.5, 0.22 * len(pj) + 1.8))
@@ -319,7 +319,7 @@ ax.set_ylim(-0.7, len(pj) - 0.3)
 ax.set_xlabel("Muutus lühikese koolivaheaja ajal, % (vs 2 nädalat enne ja pärast)")
 ax.set_title("Lühikese koolivaheaja mõju ristmike kaupa")
 ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.06 if len(pj) > 30 else -0.13), ncol=3, fontsize=8)
-save(fig, "06_koolivaheajad_ristmikud")
+save(fig, "06_06_koolivaheajad_ristmikud")
 
 # --- 4) Hajutamise stsenaariumid --------------------------------------------------------------------
 SHARES = np.arange(0, 0.41, 0.05)
@@ -370,7 +370,7 @@ axes[0, 0].legend(loc="lower left", fontsize=9)
 fig.suptitle("Hajutamise mõju tipptunnile (ristmike mediaan, vöönd = kvartiilid)",
              x=0.01, ha="left", fontweight="bold")
 fig.tight_layout()
-save(fig, "06_hajutamine")
+save(fig, "06_07_hajutamine")
 
 # näide: suurima hommikuse tipuga ristmik
 top = pm[pm.mp_id > 0].sort_values("hommik_soid_h", ascending=False).iloc[0]
@@ -389,7 +389,7 @@ ax.set_xlabel("Kellaaeg")
 ax.set_ylabel(f"Sõidukeid {MIN} min kohta")
 ax.set_title(f"Hajutamise näide: {top.code} {top.nimi} (hommik, tüüpiline tööpäev)")
 ax.legend(loc="lower right", fontsize=9)
-save(fig, "06_hajutamine_naide")
+save(fig, "06_08_hajutamine_naide")
 
 # --- 5) Kuuindeks vs Harjumaa kütusemüük --------------------------------------------------------------
 if SUUND:      # suuna osakaal on ristmikul konstantne -> kuuindeks sama mis kokku; kütusel suunda pole
@@ -428,7 +428,7 @@ ax.set_title(f"Tallinna ristmike liiklus vs Harjumaa kütusemüük\n(taseme r = 
              f"{c2.r:.2f}; n = {int(c.n)} kuud)", fontsize=11)
 ax.set_ylabel(f"Indeks, {TALLINN_BASE_YEAR} = 100")
 ax.legend(loc="lower right", fontsize=8, ncol=2)
-save(fig, "06_kutus_harju")
+save(fig, "06_09_kutus_harju")
 
 print("\nTipptunnid (tüüpiline tööpäev):")
 print(pm[["code", "nimi", "paevi", "ooopaev", "hommik_algus", "hommik_soid_h", "hommik_osakaal_%",

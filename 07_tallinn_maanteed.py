@@ -39,27 +39,27 @@ ARVUTUS
     kerged ja rasked sõidukid; korrelatsioon Harjumaa müügiindeksiga tasemes, kuumuutustes ja aastamuutustes.
 
 VÄLJUND (kaust valjund/, suunaanalüüsis valjund/LSS või valjund/LVS)
-  07_profiilid_linnad.png
+  07_01_profiilid_linnad.png
       Näitab: tööpäeva liikluse jaotust linna sisse- ja väljasõidul linnade kaupa.
       Kuidas: paneel linna kohta; x-telg = kellaaeg, y-telg = osakaal ööpäeva liiklusest, % tunnis. Sinine = sissesõit,
       oranž = väljasõit, türkiis katkendjoon = muu; Tallinna paneelil tume joon = linna ristmikud.
-  07_tipu_teravus.png
+  07_02_tipu_teravus.png
       Näitab: kui terav on tipp eri linnades ja suundades.
       Kuidas: punktdiagrammid 2 x 2 (veerud: hommik, õhtu). Ülal tipptunni osakaal ööpäevast, %; all teoreetiline
       hajutamise potentsiaal, %. x-telg = linn ja suund, punkt = loenduskoht, kriips = mediaan.
-  07_kaart_harju.png, 07_kaart_tallinn.png, 07_kaart_kesklinn.png
+  07_03_kaart_harju.png, 07_04_kaart_tallinn.png, 07_05_kaart_kesklinn.png
       Näitab: millal liiklus eri kohtades toimub (Harjumaa; Tallinn; kesklinn kuni 3 km).
       Kuidas: kaks kaarti ortofototaustal - hommik 06-10 (maanteel sissesuund, sinised toonid) ja õhtu 15-19 (maanteel
       väljasuund, oranžid toonid). Ruut = linna ristmik, ring = maanteeloendur. Värv = liikluse keskaeg (hilisem =
       tumedam; värviskaala otstes varaseim ja hiliseim väärtus), suurus = ööpäevane liiklus (ruutjuure skaalas).
       Katkendraam Tallinna kaardil = kesklinna lähivaate ala.
-  07_paevane_seos.png
+  07_06_paevane_seos.png
       Näitab: kas linna ristmike ja Tallinna sissesõiduteede liiklus kõigub päevade kaupa koos.
       Kuidas: vasakul päevaindeksite 7 päeva libisev keskmine (tume = ristmikud, sinine = sissesõiduteed; sama
       nädalapäev 2025 = 100). Paremal hajuvusdiagramm: punkt = päev, x = sissesõiduteede, y = ristmike indeks; värv =
       päevatüüp (sinine = tööpäev õppetöö ajal, türkiis = tööpäev vaheajal, hall = nädalavahetus, oranž = püha või
       lühendatud päev); punktiir = võrdsuse joon; pealkirjas r ja n.
-  07_kutus_harju.png
+  07_07_kutus_harju.png
       Näitab: liiklusindeksite ja Harjumaa kütusemüügi käiku kuude kaupa.
       Kuidas: joondiagramm; y-telg = indeks (2025 = 100). Tume katkendjoon = ristmikud, sinine = Harjumaa
       maanteeloendurid, must jäme = kõik loenduskohad koos, oranž jäme = kütusemüük; pealkirjas r.
@@ -68,6 +68,7 @@ VÄLJUND (kaust valjund/, suunaanalüüsis valjund/LSS või valjund/LVS)
   07_linnad_kokkuvote.csv          mediaanid linna ja suuna kaupa
   07_maantee_15min_osakaalud.csv   veerandtundide osakaalud tunnis ja nende allikas (15 min loendus või DATEX)
   07_maantee_profiilid.csv         Tallinna kaardi maanteeloendurite 15 min profiilid (06 kasutab; 07 käib enne 06)
+  07_maantee_profiilid_koik.csv    kõigi maanteeloendurite 15 min profiilid (07_2 kasutab)
   07_paevane_seos.csv, 07_paevane_korrelatsioon.csv, 07_kuuindeksid.csv, 07_kutus_korrelatsioon.csv
 """
 import sys
@@ -80,7 +81,7 @@ import seaborn as sns
 from common import (load_tallinn, load_junctions, load_locations, load_daily, counter_month,
                     load_fuel_county, peak_metrics, ratio_index, corr_pair, set_style, save, day_calendar,
                     add_basemap, to_merc, load_vehicles, five_min_shares, to_5min, load_datex_quarters,
-                    SUUND, SUUND_MAANTEE, RES, km, ends, load_15m, ilma_vigaste_kuudeta, otsamargid,
+                    SUUND, SUUND_MAANTEE, RES, km, ends, load_15m, ilma_vigaste_kuudeta, bbox, map_extent, timing_map,
                     save_table, CLASS_COLS, tabel, load_hourly_profile, load_datex_sites, TALLINN_BASE_YEAR,
                     C_BLUE, C_ORANGE, C_AQUA, C_YELLOW, C_GRAY, TEXT2)
 
@@ -96,13 +97,6 @@ CITIES = {"Tallinn": (59.4372, 24.7454), "Tartu": (58.3806, 26.7225),
 LABEL_NAME = {"Tallinn": ("tallinn", "talinn"), "Tartu": ("tartu",), "Pärnu": ("parnu", "pärnu"),
               "Viimsi": ("viimsi",)}
 SUUND_COLOR = {"sisse": C_BLUE, "välja": C_ORANGE, "muu": C_AQUA}
-
-
-def bbox(df, pad=0.06):
-    """Punktide (veerud lon, lat) ümbris (lon0, lat0, lon1, lat1), igas servas lisatud `pad` osa ulatusest."""
-    lo0, lo1, la0, la1 = df.lon.min(), df.lon.max(), df.lat.min(), df.lat.max()
-    dx, dy = (lo1 - lo0) * pad, (la1 - la0) * pad
-    return lo0 - dx, la0 - dy, lo1 + dx, la1 + dy
 
 
 print("Laen andmeid...")
@@ -249,6 +243,9 @@ if rows:
           + (f" (sobitus r mediaan {dx.groupby('datex_site').r.first().median():.2f}; tipptundidest DATEX-i veerandid "
              f"{dx[dx.tund.isin([6, 7, 8, 9, 15, 16, 17, 18])].datex_tund.mean() * 100:.0f}%)" if len(dx) else ""))
 save_table(sites, "07_tipptunnid_kohad")
+save_table(pd.DataFrame([{"id": k[0], "linn": k[1], "suund": k[2], "samm": hw_res[k],     # kõik maanteed (07_2)
+                          **{str(i): x for i, x in enumerate(np.round(v, 2))}} for k, v in hw15.items()]),
+           "07_maantee_profiilid_koik")
 
 # linnade kokkuvõte (mediaanid)
 grp_order = [("Tallinn", "ristmik"), ("Tallinn", "sisse"), ("Tallinn", "välja"), ("Tallinn", "muu"),
@@ -269,7 +266,7 @@ save_table(summ.reset_index(), "07_linnad_kokkuvote")
 print("\nLinnade kokkuvõte (mediaanid; algus = tunni algus):")
 print(summ.round(1).to_string())
 
-# 07_profiilid_linnad: osakaal ööpäevast tunni kaupa
+# 07_01_profiilid_linnad: osakaal ööpäevast tunni kaupa
 share = lambda df: df.sum(axis=0) / df.sum(axis=0).sum() * 100
 cities = [c for c in CITIES if c == "Tallinn" or c in site_h.index.get_level_values("linn")]
 nr = (len(cities) + 1) // 2
@@ -299,9 +296,9 @@ for ax in axes[:, 0]:
 fig.suptitle("Tööpäeva tunniprofiil linnade kaupa (E-R, september-mai, 2024-2026)",
              x=0.01, ha="left", fontweight="bold")
 fig.tight_layout()
-save(fig, "07_profiilid_linnad")
+save(fig, "07_01_profiilid_linnad")
 
-# 07_tipu_teravus: tipptunni osakaal ööpäevast ja teoreetiline hajutamise potentsiaal
+# 07_02_tipu_teravus: tipptunni osakaal ööpäevast ja teoreetiline hajutamise potentsiaal
 sites["grupp"] = sites["linn"] + "\n" + sites["suund"]
 order = [f"{c}\n{s}" for c, s in grp_order if ((sites.linn == c) & (sites.suund == s)).any()]
 fig, axes = plt.subplots(2, 2, figsize=(14, 8), sharex=True)
@@ -321,139 +318,15 @@ for i, (name, lab) in enumerate([("hommik", "Hommikune tipptund"), ("ohtu", "Õh
             ax.axhline(0, color=TEXT2, lw=0.6)
         ax.tick_params(axis="x", labelsize=8)
 fig.tight_layout()
-save(fig, "07_tipu_teravus")
+save(fig, "07_02_tipu_teravus")
 
 # --- b) Kaardid satelliitaluskaardiga: Harjumaa ja Tallinn -------------------------------------
-import matplotlib.patheffects as pe
-from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
-
 harju_ids = set(loc.loc[loc.maakond == "Harju", "id"])
 mp_ = sites[(sites.tyyp == "ristmik") | (sites.id.isin(harju_ids))]
-HALO = [pe.withStroke(linewidth=2.2, foreground="white")]
-
-
-def ramp(name):
-    """Ühe tooniga skaala heledast tumedani, kõige heledam osa välja (satelliidil nähtav)."""
-    return LinearSegmentedColormap.from_list(name + "_t", plt.get_cmap(name)(np.linspace(0.3, 1, 256)))
-
-
-def map_extent(df, pad=0.06):
-    """Kaardi ulatus (lon0, lat0, lon1, lat1): punktid + äär, all lisaruum mõõtkavale."""
-    lon0, lat0, lon1, lat1 = bbox(df, pad)
-    return lon0, lat0 - 0.06 * (lat1 - lat0), lon1, lat1
-
-
-def hhmm(h):
-    """Kellaaeg tundides (nt 7.5) -> 'HH:MM' ('07:30')."""
-    m = int(round(h * 60))
-    return f"{m // 60:02d}:{m % 60:02d}"
-
-
-def time_ticks(vmin, vmax):
-    """Värviskaala märgid: samm 1/2/5/10/15/30 min nii, et märke oleks kuni 7."""
-    span = (vmax - vmin) * 60
-    step = next((st for st in (1, 2, 5, 10, 15, 30) if span / st <= 6), 60)
-    return np.arange(np.ceil(vmin * 60 / step) * step, vmax * 60 + 1e-6, step) / 60
-
-
-def place_labels(ax, xs, ys, texts, fontsize=6.5, order=None, obstacles=None):
-    """Lihtne siltide paigutus: iga punkti jaoks proovitakse 8 suunda ja valitakse esimene,
-    mis ei kattu juba paigutatud siltide ega markeritega (ekraanikoordinaatides).
-    obstacles = (x, y, s) massiivid: markerite asukohad ja scatter-suurused (pt^2)."""
-    fig = ax.figure
-    fig.canvas.draw()
-    to_px = ax.transData.transform
-    pts = to_px(np.column_stack([xs, ys]))
-    placed = []
-    dpi_k = fig.dpi / 72
-    if obstacles is not None:
-        ox, oy, os_ = obstacles
-        for (px_, py_), sz in zip(to_px(np.column_stack([ox, oy])), os_):
-            r = np.sqrt(sz) / 2 * dpi_k * 0.9
-            placed.append((px_ - r, py_ - r, px_ + r, py_ + r))
-    offsets = [(6, 5), (6, -11), (-6, 5), (-6, -11), (9, -3), (-9, -3), (0, 9), (0, -15)]
-    idx = order if order is not None else range(len(texts))
-    for i in idx:
-        w, h = len(texts[i]) * fontsize * 0.62 * dpi_k, fontsize * 1.25 * dpi_k
-        best = None
-        for dx, dy in offsets:
-            x0 = pts[i, 0] + dx * dpi_k - (w if dx < 0 else (w / 2 if dx == 0 else 0))
-            y0 = pts[i, 1] + dy * dpi_k
-            box = (x0, y0, x0 + w, y0 + h)
-            hit = any(not (box[2] < b[0] or box[0] > b[2] or box[3] < b[1] or box[1] > b[3]) for b in placed)
-            if not hit:
-                best = (dx, dy, box)
-                break
-        if best is None:
-            best = (offsets[0][0], offsets[0][1], None)
-        dx, dy, box = best
-        if box is not None:
-            placed.append(box)
-        ha = "left" if dx > 0 else ("right" if dx < 0 else "center")
-        ax.annotate(texts[i], (xs[i], ys[i]), xytext=(dx, dy), textcoords="offset points", fontsize=fontsize,
-                    ha=ha, va="bottom", color="black", zorder=6, path_effects=HALO)
-
-
-def timing_map(df, fname, title, label_junctions, size_k, label_fs=6.5, pad=0.06, zoom_box=None,
-               zoom_label=""):
-    """Kaks paneeli (hommik, õhtu) satelliittaustal. zoom_box = (lon0, lat0, lon1, lat1): lähivaate
-    ala, mis joonistatakse katkendliku raamina; selle sees olevaid ristmikke ei nimetata."""
-    lon0, lat0, lon1, lat1 = map_extent(df, pad)
-    (mx0, my0), (mx1, my1) = to_merc(lon0, lat0), to_merc(lon1, lat1)
-    ratio = (mx1 - mx0) / (my1 - my0)
-    fig, axes = plt.subplots(1, 2, figsize=(15, 6.3 / ratio + 1.1), layout="constrained")
-    attribution = None
-    for ax, (name, suund, cmap, lab) in zip(axes, [
-            ("hommik", "sisse", ramp("Blues"), "Hommik 06-10 (maanteel: sissesõit linna)"),
-            ("ohtu", "välja", ramp("Oranges"), "Õhtu 15-19 (maanteel: väljasõit linnast)")]):
-        attribution = add_basemap(ax, lon0, lat0, lon1, lat1)
-        sub = df[(df.tyyp == "ristmik") | (df.suund == (SUUND_MAANTEE or suund))]
-        lab = f"{lab.split(' (')[0]} ({SUUND}, maanteel {SUUND_MAANTEE})" if SUUND else lab
-        vmin, vmax = sub[f"{name}_keskaeg_h"].min(), sub[f"{name}_keskaeg_h"].max()     # skaala otsad = vähim ja suurim
-        for tyyp, marker in [("maantee", "o"), ("ristmik", "s")]:
-            s2 = sub[sub.tyyp == tyyp]
-            mx, my = to_merc(s2.lon.values, s2.lat.values)
-            sc = ax.scatter(mx, my, c=s2[f"{name}_keskaeg_h"], cmap=cmap, vmin=vmin, vmax=vmax,
-                            s=np.sqrt(s2.ooopaev) * size_k, marker=marker, edgecolor="black",
-                            linewidth=0.7, zorder=5)
-        named = sub[(sub.tyyp == "maantee") | label_junctions]
-        if zoom_box is not None:
-            zx0, zy0, zx1, zy1 = zoom_box
-            inside = named.lon.between(zx0, zx1) & named.lat.between(zy0, zy1) & (named.tyyp == "ristmik")
-            named = named[~inside]
-            (rx0, ry0), (rx1, ry1) = to_merc(zx0, zy0), to_merc(zx1, zy1)
-            ax.add_patch(Rectangle((rx0, ry0), rx1 - rx0, ry1 - ry0, fill=False, ls="--", lw=1.2,
-                                   ec="black", zorder=4))
-            ax.annotate(zoom_label, (rx0, ry1), xytext=(2, 3), textcoords="offset points", fontsize=7,
-                        ha="left", va="bottom", zorder=6, path_effects=HALO)
-        lbl = named.sort_values("ooopaev", ascending=False)
-        lx, ly = to_merc(lbl.lon.values, lbl.lat.values)
-        texts = [r.koht.split(" (")[0] if r.tyyp == "maantee" else r.id for r in lbl.itertuples()]
-        ox, oy = to_merc(sub.lon.values, sub.lat.values)
-        place_labels(ax, lx, ly, texts, fontsize=label_fs,
-                     obstacles=(ox, oy, np.sqrt(sub.ooopaev.values) * size_k))
-        ax.set_title(lab, fontsize=11)
-        cb = fig.colorbar(sc, ax=ax, shrink=0.75)
-        cb.set_ticks(time_ticks(vmin, vmax))
-        otsamargid(cb, hhmm)
-        cb.set_label("Liikluse keskaeg (hilisem = tumedam)")
-    handles = [Line2D([], [], marker="s", ls="", color=C_GRAY, markeredgecolor="black", ms=8, label="linna ristmik")]
-    if (df.tyyp == "maantee").any():
-        handles.append(Line2D([], [], marker="o", ls="", color=C_GRAY, markeredgecolor="black", ms=8,
-                              label="maantee loendur (suund)"))
-    fig.suptitle(title, x=0.01, ha="left", fontweight="bold")
-    fig.canvas.draw()                               # paigutus valmis -> legend otse kaartide alla
-    bottom = min(a.get_position().y0 for a in axes)
-    fig.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, bottom - 0.005), ncol=len(handles),
-               fontsize=9)
-    save(fig, fname)
-    return attribution
 
 
 if not SUUND:              # suunaanalüüsis on ainult Tallinna kaardi ala maanteeloendurid
-    timing_map(mp_, "07_kaart_harju",
+    timing_map(mp_, "07_03_kaart_harju",
                "Millal liiklus toimub: mahuga kaalutud keskmine kellaaeg (suurus = ööpäevane liiklus)",
                label_junctions=False, size_k=1.3)
 jun = mp_[mp_.tyyp == "ristmik"]
@@ -467,11 +340,11 @@ save_table(pd.DataFrame([{"koht": r.koht, "id": r.id, "linn": r.linn, "suund": r
                           for r in hw.itertuples()]), "07_maantee_profiilid")
 centre = jun[km(jun.lat, jun.lon, *CITIES["Tallinn"]) <= 3.0]
 CENTRE_PAD = 0.12
-att = timing_map(in_city, "07_kaart_tallinn",
+att = timing_map(in_city, "07_04_kaart_tallinn",
                  f"Tallinna ristmikud ({len(jun)}): liikluse keskmine kellaaeg (suurus = ööpäevane liiklus)",
                  label_junctions=True, size_k=0.8, zoom_box=map_extent(centre, CENTRE_PAD),
-                 zoom_label=f"kesklinn, {len(centre)} ristmikku: vt 07_kaart_kesklinn")
-timing_map(centre, "07_kaart_kesklinn",
+                 zoom_label=f"kesklinn, {len(centre)} ristmikku: vt 07_05_kaart_kesklinn")
+timing_map(centre, "07_05_kaart_kesklinn",
            f"Tallinna ristmikud (≤ 3 km, {len(centre)}): liikluse keskmine kellaaeg (suurus = ööpäevane liiklus)",
            label_junctions=True, size_k=1.4, label_fs=8, pad=CENTRE_PAD)
 print("Kaartide taust:", att or "puudub (plaaditeenus ei vastanud - joonistati ilma taustata)")
@@ -550,7 +423,7 @@ ax.set_xlabel("Sissesõiduteed, indeks")
 ax.set_ylabel("Ristmikud, indeks")
 ax.legend(fontsize=8, loc="upper left")
 fig.tight_layout()
-save(fig, "07_paevane_seos")
+save(fig, "07_06_paevane_seos")
 
 # --- d) Kuuindeksid vs Harjumaa kütus ----------------------------------------------------------------
 dv = day[day["kehtiv"]].assign(kuu=day["paev"].dt.to_period("M"))
@@ -601,5 +474,5 @@ ax.set_title(f"Liiklus vs Harjumaa kütusemüük, {P0}...{P1} (kõik kohad: r = 
              f"kuumuutuste r = {cc[('koik_kohad', 'kuumuutus')]:.2f})", fontsize=11)
 ax.set_ylabel(f"Indeks, {TALLINN_BASE_YEAR} = 100")
 ax.legend(fontsize=8, loc="lower right", ncol=2)
-save(fig, "07_kutus_harju")
+save(fig, "07_07_kutus_harju")
 print("Valmis.")

@@ -32,23 +32,23 @@ ARVUTUS
   aeglustumise lisakulu alumine hinnang. Tulemus on kulu loenduri asukohas, mitte kogu riigi kütusekulu.
 
 VÄLJUND (kaust valjund/)
-  05_kiiruskoverad.png
+  05_01_kiiruskoverad.png
       Näitab: mudeli eeldust - kuidas kütusekulu sõltub kiirusest.
       Kuidas: joondiagramm; x-telg = kiirus, km/h, y-telg = suhteline kulu (miinimum = 1). Sinine = kerged (kl 1-5, 9),
       oranž = rasked (kl 6-8, 10); punktid = etteantud kolm punkti, mida kõver läbib.
-  05_tunniprofiil.png
+  05_02_tunniprofiil.png
       Näitab: kuidas jaotuvad tööpäeva jooksul sõidukid ja hinnanguline kütusekulu (kõik loendurid, 2023-2025).
       Kuidas: kolm paneeli ühise x-teljega (tunni algus). Ülal osakaal ööpäevast, %: hall = sõidukid, oranž = kütus.
       Keskel sõidukipargi keskmine hinnanguline kulu, l/100 km. All keskmine punktkiirus, km/h. Hall taust = tipptunnid.
-  05_lisakulu_tunnid.png
+  05_03_lisakulu_tunnid.png
       Näitab: millistes maakondades ja mis kell suurendab aeglustumine kütusekulu.
       Kuidas: soojuskaart; rida = maakond (järjestatud tipptundide keskmise lisakulu järgi), veerg = tunni algus,
       tööpäevad. Värv = aeglustumise lisakulu % võrreldes kella 10-15 kiirusjaotusega (punane = lisakulu, sinine =
       väiksem kulu; skaala otsad = väärtuste 98. protsentiil).
-  05_lisakulu_loendurid.png
+  05_04_lisakulu_loendurid.png
       Näitab: 15 loendurit, kus tipptundide aeglustumise lisakulu on suurim.
       Kuidas: rõhtsad tulbad; pikkus = lisakulu %, tulba järel väärtus ja alla 50 km/h sõitnud sõidukite osakaal.
-  05_hinnang_vs_muuk.png
+  05_05_hinnang_vs_muuk.png
       Näitab: kas loenduritest arvutatud kütuseindeks järgib tegelikku müüki.
       Kuidas: kaks paneeli (bensiin, diisel); x-telg = aeg, y-telg = indeks (2023 = 100). Hall = mudeli hinnang,
       värviline = jaemüük; pealkirjas aastaste muutuste r.
@@ -124,7 +124,7 @@ ax.set_xlabel("Kiirus, km/h")
 ax.set_ylabel("Suhteline kütusekulu (min = 1)")
 ax.set_title("Mudeli eeldus: kütusekulu sõltuvus kiirusest")
 ax.legend()
-save(fig, "05_kiiruskoverad")
+save(fig, "05_01_kiiruskoverad")
 
 # --- 2) Tunniprofiilid ja kütuse hinnang ------------------------------------------------
 print("Laen tunniprofiile...")
@@ -228,7 +228,7 @@ ax.set_ylabel("km/h")
 ax.set_title("Keskmine punktkiirus loenduri juures")
 ax.set_xlabel("Tund (algus)")
 ax.set_xticks(range(0, 24, 2))
-save(fig, "05_tunniprofiil")
+save(fig, "05_02_tunniprofiil")
 
 # --- 2b) Aeglustumise lisakulu tunni kaupa, maakonniti -----------------------------------
 w = w.merge(loc[["id", "maakond_full", "nimi", "tee_nr"]], on="id")
@@ -248,7 +248,7 @@ sns.heatmap(hm, cmap=sns.blend_palette(["#1c5cab", "#f0efec", "#b3302f"], as_cma
 ax.set_xlabel("Tund (algus), tööpäevad")
 ax.set_ylabel("")
 ax.set_title("Aeglustumisest (< 60 km/h osakaalu kasv) tulenev kütuse lisakulu")
-save(fig, "05_lisakulu_tunnid")
+save(fig, "05_03_lisakulu_tunnid")
 
 # --- 2c) Loendurid suurima tipptunni aeglustumise lisakuluga -------------------------------
 pk = w[w["tund"].isin(PEAK_HOURS)]
@@ -274,7 +274,7 @@ for y, (v, a) in enumerate(zip(top["lisakulu_aeglustumine_%"], top["alla50_%"]))
 ax.set_xlabel("Tipptundide (7-9, 16-18) aeglustumise lisakulu vs kell 10-15, %")
 ax.set_title("Loendurid suurima tipptunni aeglustumise lisakuluga")
 ax.set_xlim(0, top["lisakulu_aeglustumine_%"].max() * 1.5)
-save(fig, "05_lisakulu_loendurid")
+save(fig, "05_04_lisakulu_loendurid")
 
 # --- 3) Mudeli kütuseindeks vs tegelik müük ---------------------------------------------
 m = hp.groupby(["id", "kanal", "kuu"])[["kutus", "kutus_bensiin", "kutus_diisel", "n_hours"]].sum()
@@ -312,7 +312,7 @@ for ax, f in zip(axes, ["bensiin", "diisel"]):
     ax.axhline(100, color=TEXT2, lw=0.6, ls=":")
     ax.legend(loc="upper left", ncol=2, fontsize=9)
 month_axis(axes[1])
-save(fig, "05_hinnang_vs_muuk")
+save(fig, "05_05_hinnang_vs_muuk")
 
 print("\nTööpäeva profiil (valik):")
 print(prof.loc[[3, 7, 8, 12, 16, 17, 22], ["soidukite_osakaal_%", "kutuse_osakaal_%", "l_100km",

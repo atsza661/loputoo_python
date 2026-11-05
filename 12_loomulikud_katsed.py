@@ -21,14 +21,14 @@ A) KOOLIPÄEVA ALGUS
   Ristmik, mille ööpäeva liiklus muutus üle 15% (teetööd, ümbersõidud), jääb selle paari mediaanidest välja. Tulemus =
   mediaan üle ristmike ja mediaani 95% usaldusvahemik (bootstrap); ristmiku näitajatel (tipu algus, keskaeg, tipptunni
   maht, osakaal ööpäevast 06:00-07:30, 07:30-08:30 ja 08:30-09:30, aeg täistasemel) lisaks Wilcoxoni p.
-  12_koolialgus.png
+  12_01_koolialgus.png
       Näitab: kas ja mis kellaajal hommikune liiklus pärast muudatust nihkus.
       Kuidas: 2 x 2 paneeli. Ülal vasakul hommikune liiklus septembris, tuhat sõidukit 15 min kohta (kõik ühised
       ristmikud kokku): hall = 2024, sinine = 2025, oranž = 2026; ülal paremal sama osakaaluna ööpäevast (aastane kasv
       maha arvatud). Hall vöönd = kooli algus varem 07:45-09:00, katkendjoon = kell 9. All vasakul toores vahe ja all
       paremal puhas vahe 15 min pilude kaupa kell 5-20: oranžid tulbad = 2026 vs 2025 (vurrud = 95% usaldusvahemik),
       sinine astmeline joon = 2025 vs 2024 võrdluseks.
-  12_koolialgus_ristmikud.png
+  12_02_koolialgus_ristmikud.png
       Näitab: millistel ristmikel liikluse jaotus muutus.
       Kuidas: kaks soojuskaarti kõrvuti (2025 vs 2024 võrdluseks; 2026 vs 2025 koolialguse muutus). Rida = ristmik
       (järjestatud puhta vahe järgi kell 08:30-09:30), veerg = 15 min pilu 06:00-10:00. Värv = puhas vahe,
@@ -49,7 +49,7 @@ B) VÄIKE LANGUS, SUUR VÕIT
      rho
   Põhitulemus on ristmike ja tippude kohta, kus 09 leidis stabiilse ummiku vähemalt pooltel tööpäevadel ("ummikuga");
   teised ei pruugi täistasemel üldse küllastuda.
-  12_vaike_muutus.png
+  12_03_vaike_muutus.png
       Näitab: kui tundlik on täistasemel oldud aeg liikluse väikese muutuse suhtes.
       Kuidas: 2 x 2 paneeli. Ülal vasakul kõver: x = tipuakna liiklus, % tavalisest (100 = tavaline õppetöö-tööpäev),
       y = aeg täistasemel, min päevas; sinine = hommik, oranž = õhtu, vari = 95% usaldusvahemik, romb = koolivaheaja
@@ -195,7 +195,7 @@ for ax, liik, yl in zip(axes[1], ["toores", "puhas"], ["Muutus, %", "Muutus, pro
 fig.suptitle(f"Koolipäeva algus kell 9 (alates 1.09.2026): tööpäevad {AKEN[0]}.–{AKEN[1]}. septembril",
              x=0.01, ha="left", fontweight="bold")
 fig.tight_layout()
-save(fig, "12_koolialgus")
+save(fig, "12_01_koolialgus")
 
 H = range(24, 40)                           # 06:00-10:00
 jarj = puhas_paar[viimane][list(range(34, 38))].mean(axis=1).sort_values(ascending=False).index     # 08:30-09:30
@@ -214,7 +214,7 @@ axes[0].set_yticklabels([f"{j.at[m, 'code']} {short_name(j.at[m, 'name'], 32, co
 fig.suptitle("Kus liikluse jaotus muutus: puhas vahe ristmiku ja kellaaja kaupa (valge = ristmik sel paaril välja jäetud)",
              x=0.01, ha="left", fontweight="bold")
 fig.tight_layout()
-save(fig, "12_koolialgus_ristmikud")
+save(fig, "12_02_koolialgus_ristmikud")
 
 # === B) Väike langus, suur võit =========================================================================
 kal = too.drop_duplicates("paev").set_index("paev")["vaheaeg"]
@@ -298,7 +298,7 @@ print(f"   Lühikesed koolivaheajad ({va['vaheaeg_algus'].nunique()} tk, {RYHM};
       + "; ".join(f"{tp}: liiklus {r['liiklus_%']:+.1f}%, tipptund {r['tipptund_%']:+.1f}%, aeg täistasemel "
                   f"{r['aeg_taistasemel_%']:+.0f}%" for tp, r in vk.iterrows()))
 
-# kalibreerimine: sama näitaja sõidukipõhistest päevadest vs täis tsüklites liikunud sõidukite aeg (09, nagu 10_kullastus)
+# kalibreerimine: sama näitaja sõidukipõhistest päevadest vs täis tsüklites liikunud sõidukite aeg (09, nagu 10_02_kullastus)
 kalib = None
 veh = load_vehicles(None, koik=True)
 if veh is not None and (OUT_DIR / "09_tsuklid.csv").exists():
@@ -390,5 +390,5 @@ else:
 fig.suptitle(f"Väike langus, suur võit: aeg, mil ristmik töötab täistasemel (>= {TAIS:.0%} tavalisest suurimast 15 min loendusest)",
              x=0.01, ha="left", fontweight="bold")
 fig.tight_layout()
-save(fig, "12_vaike_muutus")
+save(fig, "12_03_vaike_muutus")
 print("Valmis.")

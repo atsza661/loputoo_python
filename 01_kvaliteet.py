@@ -24,14 +24,14 @@ ARVUTUS
      25 protsendipunkti (common.class_anomaly).
 
 VÄLJUND (kaust valjund/)
-  01_tunnid_paevas.png
+  01_01_tunnid_paevas.png
       Näitab: kui suur osa iga aasta kanal-päevadest on täielikud, osalised või topelt imporditud (arvutus 1).
       Kuidas: rõhtsad virnastatud tulbad, üks tulp aasta kohta (varaseim üleval); x-telg = osakaal kanal-päevadest, %.
       Punane = osaline päev, sinine = täispäev, oranž = topelt imporditud, hall = muud.
-  01_loendurid_kuus.png
+  01_02_loendurid_kuus.png
       Näitab: mitu loendurit annab igas kuus kasutatavaid andmeid (arvutus 3).
       Kuidas: joondiagramm; x-telg = aeg (märgid aastate kaupa), y-telg = kehtivate loendurite arv (algab nullist).
-  01_kaetus_heatmap.png
+  01_03_kaetus_heatmap.png
       Näitab: millistel kuudel on iga loenduri andmed kasutatavad.
       Kuidas: ruudustik; rida = loendur (silt "maakond · nimi", järjestatud maakonna ja teenumbri järgi), veerg = kuu
       analüüsiakna algusest lõpuni (x-teljel aastad). Sinine ruut = kehtiv loendur-kuu, hele ruut = andmeid pole või
@@ -75,7 +75,7 @@ ax.invert_yaxis()
 ax.set_xlabel("Osakaal kanal-päevadest, %")
 ax.set_title("Tunniridade arv ööpäevas kanali kohta")
 ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=3, fontsize=9)
-save(fig, "01_tunnid_paevas")
+save(fig, "01_01_tunnid_paevas")
 
 # 2) Liigi- ja kiirussumma kooskõla ---------------------------------------------
 tot_c = d[CLASS_COLS].sum(axis=1)
@@ -94,7 +94,7 @@ ax.set_ylim(0, None)
 ax.set_ylabel("Loendureid")
 ax.set_title("Kehtivate loendurite arv kuus (≥15 täispäeva, kõik suunad)")
 month_axis(ax)
-save(fig, "01_loendurid_kuus")
+save(fig, "01_02_loendurid_kuus")
 
 # 4) Heatmap: loendur x kuu -------------------------------------------------------
 months = pd.period_range(START, END, freq="M")
@@ -114,7 +114,7 @@ ax.set_xticks(xt)
 ax.set_xticklabels([months[i].year for i in xt])
 ax.grid(False)
 ax.set_title("Loendurite kehtivad kuud (sinine = kasutatav)")
-save(fig, "01_kaetus_heatmap")
+save(fig, "01_03_kaetus_heatmap")
 
 # 5) Tabelid -----------------------------------------------------------------------
 per = (d.groupby("id").agg(kanal_paevi=("paev", "size"),
