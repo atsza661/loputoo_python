@@ -1,6 +1,7 @@
-# Repos on ainult analüüsiskriptid. Andmed, väljund, puhvrid ja andmebaasi ühenduse fail jäävad välja.
+# Repos on ainult analüüsiskriptid ja andmebaasi skeem (ERD.md). Andmed, väljund, puhvrid ja andmebaasi ühenduse fail jäävad välja.
 *
 !.gitignore
 !common.py
 !run_all.py
 ![0-9][0-9]_*.py
+!ERD.md
