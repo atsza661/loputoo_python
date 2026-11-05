@@ -1,7 +1,7 @@
 """
 21 - Tipuajad kaardil 15 min andmetest: millal on tavalisel tööpäeval tipptund ja liikluse keskaeg igal maantee
 suunal ja Tallinna ristmikul. Sama kujundus kui 07_03_kaart_harju, aga kõik punktid tulevad oma 15 min loendustest
-(maanteel import_raw."15m_count", ristmikel seire 15 min loendused), mitte tunniprofiilist ega DATEX-ist.
+(maanteel highway.count_15min, ristmikel seire 15 min loendused), mitte tunniprofiilist ega DATEX-ist.
 
 SISEND
   valjund/20_kaardiandmed_15min.csv   skripti 20 tabel (20 käib enne): iga maantee suuna ja ristmiku tavalise tööpäeva

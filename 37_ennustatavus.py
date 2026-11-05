@@ -3,7 +3,7 @@
 ning kui kindel on tipptunni maht ristmike kaupa.
 
 SISEND
-  common.load_tallinn()      ristmike 15 min loendused puhastatult (import_raw.traffic_15min_tallinn)
+  common.load_tallinn()      ristmike 15 min loendused puhastatult (tallinn.count_15min)
   common.load_junctions()    ristmike nimed
 
 ARVUTUS

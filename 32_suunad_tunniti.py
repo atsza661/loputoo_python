@@ -3,8 +3,8 @@
 välja - "tõusu ja mõõna" muster) maanteeloendurites ja linna ristmikel.
 
 SISEND
-  common.maantee_suunad()    sissesõiduteede maanteeloendurite 15 min loendused suundade kaupa (import_raw."15m_count")
-  common.load_vehicles()     sõidukipõhised kirjed (import_raw.traffic24h_tallinn) koos kanali suunaga LSS / LVS
+  common.maantee_suunad()    sissesõiduteede maanteeloendurite 15 min loendused suundade kaupa (highway.count_15min)
+  common.load_vehicles()     sõidukipõhised kirjed (tallinn.vehicle_passage) koos kanali suunaga LSS / LVS
                              (common.channel_direction: manöövri nime järgi linna sisse või linnast välja)
   common.load_junctions()    ristmike nimed
 

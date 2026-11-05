@@ -3,7 +3,7 @@
 pärast keskpäeva ja millal liiklus pärastlõunal ja õhtul toimub igal Harjumaa maantee suunal ja Tallinna ristmikul. Sama kujundus kui 07_03_kaart_harju ja 21.
 
 SISEND
-  common.maantee_suunad(ALGUS)             maanteeloendurite suundade 15 min loendused (import_raw."15m_count")
+  common.maantee_suunad(ALGUS)             maanteeloendurite suundade 15 min loendused (highway.count_15min)
   common.load_tallinn(), load_junctions()  ristmike 15 min loendused puhastatult ja koordinaadid
   common.day_calendar()                    päevatüüp (laupäev, pühapäev, riigipüha) ja koolivaheajad
   valjund/20_kaardiandmed_15min.csv        maantee suuna nimetus (linna poole / linnast välja) tööpäevade järgi (20 käib enne)

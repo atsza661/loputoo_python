@@ -3,7 +3,7 @@
 Tallinna ristmikel, kaart iga veerandtunni kohta.
 
 SISEND
-  common.maantee_suunad(ALGUS)             maanteeloendurite suundade 15 min loendused (import_raw."15m_count"):
+  common.maantee_suunad(ALGUS)             maanteeloendurite suundade 15 min loendused (highway.count_15min):
                                            sõidukite arv ja kiirused; pikk ajalugu on Harjumaa loenduritel (5-37 km
                                            Tallinnast), teistel üksikud päevad, seega kaardil on Harjumaa loendurid
   common.load_tallinn(), load_junctions()  ristmike 15 min loendused puhastatult (seire.tallinn.ee) ja koordinaadid

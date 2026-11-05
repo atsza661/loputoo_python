@@ -5,7 +5,7 @@ Uurimisküsimused: (1) millised on tipptunni mustrid, (2) kui palju saab koormus
 mõju tipule; lisaks koolivaheajad kui loomulik katse ja võrdlus kütusemüügiga.
 
 SISEND
-  common.load_tallinn()                ristmike 15 min loendused (import_raw.traffic_15min_tallinn; seire.tallinn.ee
+  common.load_tallinn()                ristmike 15 min loendused (tallinn.count_15min; seire.tallinn.ee
                                        aruanne T09; ts = 15 min pilu algus) puhastatult, koos päevatüübi ja
                                        koolivaheaja märkega
   common.load_junctions()              ristmike koodid (MP01...), nimed ja koordinaadid

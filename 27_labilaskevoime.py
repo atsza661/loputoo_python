@@ -4,7 +4,7 @@ tavaline tipptund sellele; sissesõiduteede (maanteeloendur + linna serva ristmi
 hommikuse sissesõidu piir.
 
 SISEND
-  common.load_tallinn()      ristmike 15 min loendused puhastatult (import_raw.traffic_15min_tallinn), 2024-07 ...
+  common.load_tallinn()      ristmike 15 min loendused puhastatult (tallinn.count_15min), 2024-07 ...
   common.maantee_suunad()    maanteeloendurite 15 min loendused suundade kaupa: sõidukeid, radade arv, kiiruste summa
   common.load_vehicles()     sõidukipõhised kirjed (logija nädal): ristmiku sisse- ja väljasõidu (LSS/LVS) osakaal
   valjund/24_soojus_ajatelg/24_kanalid.csv, 24_koormus_5min.csv   skripti 24 väljund (24 käib enne): kanali täistase

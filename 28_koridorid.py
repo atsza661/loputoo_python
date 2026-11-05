@@ -4,7 +4,7 @@ Kas ummik tekib korraga kogu tänaval või ühes kohas ja levib edasi; kumb rist
 koos koormatud.
 
 SISEND
-  common.load_vehicles(None, koik=True)   sõidukipõhised kirjed (import_raw.traffic24h_tallinn), logija nädala
+  common.load_vehicles(None, koik=True)   sõidukipõhised kirjed (tallinn.vehicle_passage), logija nädala
                                           tööpäevad NADAL: ristmik, kanal, aeg ja loenduril oldud aeg (occ)
   common.channel_direction()              kanali suund: linna sisse (LSS) või linnast välja (LVS) manöövri nime järgi
   valjund/24_soojus_ajatelg/24_kanalid.csv   kanali täistase ja H_täis (24 käib enne)

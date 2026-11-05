@@ -5,7 +5,7 @@ loenduri liiklus oma maakonna kütusemüüki.
 SISEND
   common.load_daily(), counter_month(), clean()     kehtivad loendur-kuud ilma kahtlaste kuudeta
   common.load_locations()                           loenduri tee, maakond ja koordinaadid
-  import_raw.labisoit                               põhimaanteede aastane läbisõit, mln sõidukikilomeetrit
+  highway.road_mileage_yearly                       põhimaanteede aastane läbisõit, mln sõidukikilomeetrit
   common.load_fuel_county(), load_fuel_national()   kütusemüük maakonniti ja riigis kokku, liitrit päevas
   common.add_basemap()                              kaardi satelliit-/ortofototaust (internetita joonistatakse ilma)
 
@@ -63,7 +63,7 @@ cm = counter_month(d).merge(loc[["id", "nimi", "maakond_full", "tee_nr", "tee_ni
 cm_ok = clean(cm, klass=False)
 
 # --- a) Läbisõit vs loendurite ADT ----------------------------------------------------------
-lab = tabel("import_raw.labisoit")
+lab = tabel("highway.road_mileage_yearly")
 lab = lab[lab["Tee Nr"] != "sum"].copy()
 lab["tee_nr"] = lab["Tee Nr"].astype(int)
 lab = lab.melt(id_vars=["Tee liik", "Tee Nr", "tee_nr"], var_name="aasta", value_name="mln_skm")
@@ -180,7 +180,7 @@ fig.get_layout_engine().set(h_pad=0.1)
 save(fig, "04_04_loendur_r_kaart")
 
 # --- d) Riigi aastane läbisõit vs kütusemüük ---------------------------------------------------
-labs = tabel("import_raw.labisoit")
+labs = tabel("highway.road_mileage_yearly")
 tot = labs.drop(columns=["Tee liik", "Tee Nr"]).sum()
 tot.index = tot.index.astype(int)
 fn = load_fuel_national()

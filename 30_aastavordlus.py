@@ -2,7 +2,7 @@
 30 - Aastavõrdlus: sama sügise õppetöö nädalad 2025 ja 2026 iga ristmiku kohta - kas liiklus kasvab või kahaneb?
 
 SISEND
-  common.load_tallinn()      ristmike 15 min loendused puhastatult ja päevasummad (import_raw.traffic_15min_tallinn)
+  common.load_tallinn()      ristmike 15 min loendused puhastatult ja päevasummad (tallinn.count_15min)
 
 ARVUTUS
   Võrreldavad perioodid (PERIOODID): septembri 2. nädalast 4 õppetöö nädalat, E-R, mitte püha - 08.09.-03.10.2025 ja

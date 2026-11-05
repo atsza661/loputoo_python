@@ -3,10 +3,10 @@
 (lõputöö ptk 2.3 "Andmete ettevalmistamine ja piirangud").
 
 SISEND
-  common.load_daily()      maanteeloendurite tunniloendustest (andmebaasi tabel import_raw.hourly_count_csv) liidetud
+  common.load_daily()      maanteeloendurite tunniloendustest (andmebaasi tabel highway.count_hourly) liidetud
                            päevasummad iga loenduri iga kanali (sõiduraja) kohta: tunniridade arv päevas (hours) ning
                            sõidukid 10 sõidukiklassi ja 11 kiirusvahemiku kaupa
-  common.load_locations()  loendurite nimed, maakonnad ja teenumbrid (traffic.counter_location)
+  common.load_locations()  loendurite nimed, maakonnad ja teenumbrid (highway.counter)
 
 ARVUTUS
   1) Tunniridade arv ööpäevas. Iga kanal-päev liigitatakse tunniridade arvu järgi: <= 22 = osaline päev,

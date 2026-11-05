@@ -3,7 +3,7 @@
 küllastunud ristmikul hommiku- ja õhtutipus.
 
 SISEND
-  common.load_vehicles(None, koik=True)   sõidukipõhised kirjed (import_raw.traffic24h_tallinn): ristmik, kanal, aeg
+  common.load_vehicles(None, koik=True)   sõidukipõhised kirjed (tallinn.vehicle_passage): ristmik, kanal, aeg
   common.load_manoeuvres()                kanal -> manööver: lähtesuund (from_leg) ja sihtsuund (to_leg)
   common.load_junctions()                 ristmike nimed
 

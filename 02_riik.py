@@ -6,10 +6,10 @@ Bensiini müüki võrreldakse kergsõidukite (klassid 1-3) liiklusega ja diislik
 
 SISEND
   common.load_daily(), counter_month()   maanteeloendurite kehtivad loendur-kuud: keskmine ööpäevane liiklus
-                                         sõidukirühmade kaupa (tunniloendustest, import_raw.hourly_count_csv)
+                                         sõidukirühmade kaupa (tunniloendustest, highway.count_hourly)
   common.load_fuel_national()            kütuse jaemüük tanklatest kuude kaupa, liitrit päevas
-                                         (import_raw.jaemuuk_tanklast_monthly; bensiin = alla 98 + üle 98)
-  import_raw.jaemuuk_tanklast_biweekly   sama poolkuude kaupa (aruandeperiood 1 = kuu 1.-15. päev, 2 = 16. kuni lõpp)
+                                         (fuel.retail_monthly; bensiin = alla 98 + üle 98)
+  fuel.retail_semimonthly                sama poolkuude kaupa (aruandeperiood 1 = kuu 1.-15. päev, 2 = 16. kuni lõpp)
 
 ARVUTUS
   Liiklusindeks (common.traffic_index): iga kuu kohta nende loendurite ööpäevase liikluse summa, millel on sel kuul
@@ -164,7 +164,7 @@ save_table(el, "02_elastsus")
 print(el.round(3).to_string(index=False))
 
 # 4) Poolkuu andmed: korrelatsioon nihkega ------------------------------------------------
-bw = tabel("import_raw.jaemuuk_tanklast_biweekly")
+bw = tabel("fuel.retail_semimonthly")
 bw["pool"] = (bw["Aasta"].astype(int).astype(str) + "-" + bw["Kuu"].astype(int).astype(str).str.zfill(2)
               + "-" + bw["Aruande-periood"].map({1: "01", 2: "16"}))
 start = pd.to_datetime(bw["pool"])

@@ -4,9 +4,9 @@
 loendused (T09) ja sõidukipõhised kirjed (Traffic 24h, 1 min täpsusega).
 
 SISEND
-  common.load_tallinn()      ristmike 15 min loendused puhastatult (import_raw.traffic_15min_tallinn); kasutatakse
+  common.load_tallinn()      ristmike 15 min loendused puhastatult (tallinn.count_15min); kasutatakse
                              tööpäevi (E-R, mitte püha ega lühendatud päev) õppetöö ajal alates T09_ALGUS
-  common.load_vehicles()     sõidukipõhised kirjed (import_raw.traffic24h_tallinn), tööpäevad SOIDUKI_PAEVAD
+  common.load_vehicles()     sõidukipõhised kirjed (tallinn.vehicle_passage), tööpäevad SOIDUKI_PAEVAD
 
 ARVUTUS
   Ristmiku profiil = iga pilu keskmine üle kehtivate tööpäevade: 15 min andmetes 96 pilu (päev, kust on puudu üle

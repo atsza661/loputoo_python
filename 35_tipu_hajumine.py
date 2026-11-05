@@ -4,7 +4,7 @@
 tipp laienema.
 
 SISEND
-  common.load_tallinn()      ristmike 15 min loendused puhastatult (import_raw.traffic_15min_tallinn)
+  common.load_tallinn()      ristmike 15 min loendused puhastatult (tallinn.count_15min)
 
 ARVUTUS
   Päevad: tööpäevad (E-R, mitte püha ega lühendatud päev), ka koolivaheajal - kuu väärtus sisaldab sama kuu vaheaegu

@@ -3,10 +3,10 @@
 Tallinna lähedal ning D) maantee kui linna ummiku eelhoiatus.
 
 SISEND (loeb common.maantee_suunad(), sama ettevalmistus on ka skriptis 20)
-  common.load_15m()                          maanteeloendurite 15 min loendused (import_raw."15m_count"): sõidukite arv,
+  common.load_15m()                          maanteeloendurite 15 min loendused (highway.count_15min): sõidukite arv,
                                              alla 40 km/h sõitnute arv ja kiiruste summa (keskmise kiiruse jaoks). Pikk
                                              ajalugu on Harjumaa loenduritel (5-37 km Tallinnast); teistel üksikud päevad
-  traffic.counter_channel                    radade nimed; loenduri suund = raja nime otspunktid (nt "Tartu - Tallinn")
+  highway.counter_channel                    radade nimed; loenduri suund = raja nime otspunktid (nt "Tartu - Tallinn")
   common.load_locations()                    loenduri nimi, tee number, tee km ja koordinaadid
   common.load_daily(), counter_month()       kahtlase mahuga loendur-kuude väljajätmiseks (nt Kodasoo 2025-09...2026-05)
   common.day_calendar()                      päevatüüp ja koolivaheajad

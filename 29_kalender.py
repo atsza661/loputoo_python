@@ -3,7 +3,7 @@
 koolivaheajad ja andmeaugud korraga näha).
 
 SISEND
-  common.load_tallinn()      ristmike 15 min loendused puhastatult ja päevasummad (import_raw.traffic_15min_tallinn)
+  common.load_tallinn()      ristmike 15 min loendused puhastatult ja päevasummad (tallinn.count_15min)
   common.day_calendar()      päevatüüp (tööpäev, laupäev, pühapäev, riigipüha, lühendatud) ja koolivaheaeg
 
 ARVUTUS

@@ -3,7 +3,7 @@
 naaberristmikel? Linna ühine kõikumine (ilm, pühad, kooliaeg) võetakse enne välja, nii et alles jääb kohalik seos.
 
 SISEND
-  common.load_tallinn()      ristmike 15 min loendused puhastatult (import_raw.traffic_15min_tallinn)
+  common.load_tallinn()      ristmike 15 min loendused puhastatult (tallinn.count_15min)
   common.load_junctions(), add_basemap()   ristmike koordinaadid ja kaardi taust
 
 ARVUTUS

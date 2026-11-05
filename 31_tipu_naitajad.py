@@ -3,7 +3,7 @@
 õhtutipu suurus ja kellaaeg - liikluskorralduse standardnäitajad, mis näitavad, kui terav ja kui suur on tipp.
 
 SISEND
-  common.load_tallinn()      ristmike 15 min loendused puhastatult (import_raw.traffic_15min_tallinn)
+  common.load_tallinn()      ristmike 15 min loendused puhastatult (tallinn.count_15min)
 
 ARVUTUS
   Tüüpiline tööpäev (nagu 06): E-R õppetöö ajal, mitte püha ega lühendatud päev, alates ALGUS (vähemalt MIN_PAEVI

@@ -5,7 +5,7 @@ palju kiirust ja aega võidab 15/30/45/60 min enne ummiku algust või pärast se
 (fooritsüklit pole) on ummik kiiruse langus.
 
 SISEND
-  common.load_vehicles(None, koik=True)   kõik sõidukipõhised kirjed (import_raw.traffic24h_tallinn): ristmik, kanal,
+  common.load_vehicles(None, koik=True)   kõik sõidukipõhised kirjed (tallinn.vehicle_passage): ristmik, kanal,
                                           aeg, kiirus ja loenduril oldud aeg (occ) iga sõiduki kohta; 30.09.2026 ööpäev
                                           ja logija nädal, kui see on andmebaasi laetud
   common.load_manoeuvres()                kanal -> manööver (T08 "Suund"), nt "Tulika VS → PP Endla LVS"

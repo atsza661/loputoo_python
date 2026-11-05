@@ -6,9 +6,9 @@ maantee ääres) võib seos olla nõrgem - see on tulemus omaette, mitte viga.
 
 SISEND
   common.load_daily(), counter_month()   kehtivad loendur-kuud (maanteeloendurite tunniloendustest)
-  common.load_locations()                loenduri maakond (traffic.counter_location)
+  common.load_locations()                loenduri maakond (highway.counter)
   common.load_fuel_county()              bensiini ja diislikütuse müük maakonniti, liitrit päevas
-                                         (import_raw.bensiin_maakond_monthly, import_raw.diisel_maakond_monthly)
+                                         (fuel.petrol_county_monthly, fuel.diesel_county_monthly)
 
 ARVUTUS
   Liiklusindeks maakonniti (common.traffic_index, 2023 = 100): nagu skriptis 02, aga iga maakonna loenduritest eraldi;

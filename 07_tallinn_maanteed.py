@@ -6,7 +6,7 @@ SISEND
   common.load_tallinn(), load_junctions()            ristmike 15 min loendused puhastatult; ristmike nimed, koordinaadid
   common.load_hourly_profile()                       maanteeloendurite tunniprofiil kuu ja päevatüübi kaupa
   common.load_daily(), counter_month()               maanteeloendurite päevasummad ja kehtivad loendur-kuud
-  common.load_locations(), traffic.counter_channel   loendurite asukohad ja radade nimed (nt "Tartu - Tallinn")
+  common.load_locations(), highway.counter_channel   loendurite asukohad ja radade nimed (nt "Tartu - Tallinn")
   common.load_15m()                                  maanteeloendurite 15 min loendused (Harjumaa loendurid)
   common.load_datex_quarters(), load_datex_sites()   DATEX II 15 min vood ühe ööpäeva kohta (loendurid, millel oma
                                                      15 min loendusi pole)
@@ -104,7 +104,7 @@ t, day = load_tallinn()
 jn = load_junctions()
 TALLINN_BBOX = bbox(jn, pad=0.04)       # Tallinna kaardi ala: kõigi ristmike ümbris (sama igas suunaanalüüsis)
 loc = load_locations()
-chn = tabel("traffic.counter_channel", dtype={"id": str})
+chn = tabel("highway.counter_channel", dtype={"id": str})
 d = load_daily()
 cm = counter_month(d)
 bad_months = cm.loc[cm["maht_kahtlane"], ["id", "kuu"]]
@@ -190,7 +190,7 @@ def jaga(key, q4, **info):
                 .assign(id=key[0], linn=key[1], suund=key[2], tund=range(24), **info))
 
 
-# 1) Loenduri enda 15 min loendused (import_raw."15m_count", Harjumaa loendurid): veerandtundide osakaalud samadelt
+# 1) Loenduri enda 15 min loendused (highway.count_15min, Harjumaa loendurid): veerandtundide osakaalud samadelt
 #    päevadelt kui tunniprofiil (E-R, koolikuud, P0...P1, ilma kahtlase mahuga kuudeta).
 m15 = ilma_vigaste_kuudeta(load_15m(), cm)
 m15 = m15[(m15.ts.dt.dayofweek < 5) & m15.ts.dt.month.isin(SCHOOL_MONTHS) & (m15.ts >= P0.start_time) & (m15.ts <= P1.end_time)]

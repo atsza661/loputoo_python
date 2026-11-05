@@ -4,7 +4,7 @@ igal 5 minutil kell 06.00-19.00, kaheksa järjestikust päeva. Kaart iga 5 min k
 kohta ristmik x kellaaeg soojuskaart.
 
 SISEND
-  common.load_vehicles(koik=True)   Traffic 24h sõidukikirjed (import_raw.traffic24h_tallinn, puhastatud): ristmik,
+  common.load_vehicles(koik=True)   Traffic 24h sõidukikirjed (tallinn.vehicle_passage, puhastatud): ristmik,
                                     kanal (loendur = rada), aeg, loenduril oldud aeg occ (s); päevad PAEVAD
   common.load_junctions()           ristmike koodid, nimed ja koordinaadid
   common.add_basemap()              ortofototaust (Maa- ja Ruumiamet; internetita joonistatakse ilma)

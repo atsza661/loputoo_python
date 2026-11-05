@@ -4,7 +4,7 @@ ristmikel oleks liiklus märgatavalt kiirem - rohkem, kui see niigi päevast pä
 viivitus -> kiirus, B = ummikuosa sõidukipõhistest loendustest; kontroll maanteeloendurite mõõdetud kiirusega.
 
 SISEND
-  common.tooaeva_profiilid()     ristmike 15 min loendused (import_raw.traffic_15min_tallinn): tavalised tööpäevad
+  common.tooaeva_profiilid()     ristmike 15 min loendused (tallinn.count_15min): tavalised tööpäevad
                                  (E-R, õppetöö, mitte püha ega lühendatud päev) 01.09.2025 kuni andmete lõpuni
   common.mudeli_parameetrid()    mudelite parameetrid skriptide 09, 24, 27 ja 33 tabelitest (vt allpool)
   common.maantee_suunad()        maanteeloendurite 15 min loendused ja kiirused (kontroll)

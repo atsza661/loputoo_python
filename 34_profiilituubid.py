@@ -3,7 +3,7 @@
 pendeltipp, kus õhtune tipp, kus päev on ühtlane - ja rühmad kaardil.
 
 SISEND
-  common.load_tallinn()      ristmike 15 min loendused puhastatult (import_raw.traffic_15min_tallinn)
+  common.load_tallinn()      ristmike 15 min loendused puhastatult (tallinn.count_15min)
   common.load_junctions(), add_basemap()   ristmike koordinaadid ja kaardi taust
 
 ARVUTUS

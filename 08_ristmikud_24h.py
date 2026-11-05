@@ -4,7 +4,7 @@ ristmike vahel ning 5 min osakaalud 15 min pilu sees. Jooniseid see skript ei te
 jaotust (common.five_min_shares), et arvutada tipu algus ja liikluse keskaeg 5 min täpsusega.
 
 SISEND
-  common.load_vehicles()     iga sõiduk eraldi rida (import_raw.traffic24h_tallinn): ristmik, kanal, aeg, kiirus, pikkus
+  common.load_vehicles()     iga sõiduk eraldi rida (tallinn.vehicle_passage): ristmik, kanal, aeg, kiirus, pikkus
   common.load_manoeuvres()   mida iga ristmiku kanal loendab: suund (manööver, T08 "Suund"), lähte- ja sihtharu
 
 ARVUTUS

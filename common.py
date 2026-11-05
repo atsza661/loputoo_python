@@ -6,23 +6,23 @@ juures on kirjas, mida see võtab, mida tagastab ja kuidas arvutab.
 ANDMED
   Kõik andmed loetakse PostgreSQL andmebaasist (funktsioonid sql, tabel, puhver); kohalikke andmefaile ei loeta.
   Ühenduse andmed ei ole koodis: fail db_yhendus.txt või libpq keskkonnamuutujad (vt allpool osa "Andmebaas").
-  Tabelid:
-    import_raw.hourly_count_csv          maanteede püsiloendurite tunniloendused (sõidukiklassid 1-10, kiirusvahemikud)
-    import_raw."15m_count"               samade loendurite 15 min loendused
-    traffic.counter_location,            loendurite asukohad ja radade nimed
-    traffic.counter_channel
-    import_raw.jaemuuk_tanklast_monthly, kütuse jaemüük tanklatest kuu ja poolkuu kaupa
-    import_raw.jaemuuk_tanklast_biweekly
-    import_raw.bensiin_maakond_monthly,  kütusemüük maakonniti
-    import_raw.diisel_maakond_monthly
-    import_raw.labisoit                  põhimaanteede aastane läbisõit
-    import_raw.traffic_15min_tallinn     Tallinna ristmike 15 min loendused (seire.tallinn.ee, aruanne T09)
-    import_raw.tallinn_junction,         ristmikud; mida iga kanal loendab; kontrolleri pordi ja ristmiku vastavus
-    import_raw.tallinn_detector_manoeuvre,
-    import_raw.tallinn_serial_port
-    import_raw.traffic24h_tallinn        ristmike sõidukipõhised kirjed (iga sõiduk eraldi rida)
-    import_raw.datex_site,               DATEX II loenduskohad ja nende 15 min vood
-    import_raw.datex_15min
+  Tabelid (andmebaasis ingliskeelsed nimed; koodis jäävad veergudele endised nimed, vt VANAD_VEERUD):
+    highway.count_hourly          maanteede püsiloendurite tunniloendused (sõidukiklassid 1-10, kiirusvahemikud)
+    highway.count_15min           samade loendurite 15 min loendused
+    highway.counter,              loendurite asukohad ja radade nimed
+    highway.counter_channel
+    highway.road_mileage_yearly   põhimaanteede aastane läbisõit
+    highway.datex_site,           DATEX II loenduskohad ja nende 15 min vood
+    highway.datex_flow_15min
+    fuel.retail_monthly,          kütuse jaemüük tanklatest kuu ja poolkuu kaupa
+    fuel.retail_semimonthly
+    fuel.petrol_county_monthly,   kütusemüük maakonniti
+    fuel.diesel_county_monthly
+    tallinn.count_15min           Tallinna ristmike 15 min loendused (seire.tallinn.ee, aruanne T09)
+    tallinn.junction,             ristmikud; mida iga kanal loendab; kontrolleri pordi ja ristmiku vastavus
+    tallinn.detector_channel,
+    tallinn.serial_port
+    tallinn.vehicle_passage       ristmike sõidukipõhised kirjed (iga sõiduk eraldi rida)
   Suurte päringute tulemus hoitakse kohalikus puhvris db_cache/ ja uuendatakse ise, kui tabel on muutunud (puhver).
 
 SEADED KESKKONNAMUUTUJATEGA (skriptid 06 ja 07)
@@ -174,6 +174,31 @@ _YHENDUS = DATA_DIR / "db_yhendus.txt"
 DB = dict(x.split("=", 1) for x in _YHENDUS.read_text(encoding="utf-8").split()) if _YHENDUS.exists() else {}
 CACHE = DATA_DIR / "db_cache"       # suurte päringute kohalik puhver (vt puhver); võib alati kustutada
 
+# Andmebaasis on ingliskeelsed tabeli- ja veerunimed (skeemid highway, tallinn, fuel). Analüüsikood kasutab endiselt
+# varasemaid veerunimesid (id, kanal, aeg, "1"..."10", "<40Kph", "Tee Nr" jne): päringud nimetavad veerud AS-iga tagasi
+# ja tabel() teeb sama VANAD_VEERUD järgi, nii et DataFrame'id, joonised ja väljundtabelid ei muutu.
+DB_COL = {**{c: f"cls_{c}" for c in CLASS_COLS},                  # klass "1" -> cls_1, kiirusvahemik "<40Kph" -> spd_lt40
+          **dict(zip(SPEED_COLS, ["spd_lt40", "spd_40_50", "spd_50_60", "spd_60_70", "spd_70_80", "spd_80_90",
+                                  "spd_90_100", "spd_100_110", "spd_110_120", "spd_120_130", "spd_ge130"]))}
+_KUTUS = {"year": "Aasta", "month": "Kuu", "petrol_lt98": "Bensiin < 98", "petrol_gt98": "Bensiin > 98",
+          "diesel": "Diisel", "diesel_special": "Eriotstarbeline diisel"}
+_MAAKONNAD = {"year": "Aasta", "month": "Kuu",
+              **{m.lower().replace("-", "_"): m + "maa" for m in ["Harju", "Hiiu", "Ida-Viru", "Jarva", "Jogeva",
+                 "Laane-Viru", "Laane", "Parnu", "Polva", "Rapla", "Saare", "Tartu", "Valga", "Viljandi", "Voru"]}}
+VANAD_VEERUD = {                    # tabel(): andmebaasi veerg -> koodis kasutatav nimi
+    "highway.counter": {"counter_id": "id", "name": "nimi", "county": "maakond", "road_name": "tee_nimi",
+                        "road_no": "tee_nr", "road_km": "tee_km", "lat": "latitude", "lon": "longitude",
+                        "counter_type": "liik", "installed_year": "paigaldatud",
+                        "last_open_data_year": "viimased_avaandmed"},
+    "highway.counter_channel": {"counter_id": "id", "channel": "kanal", "label": "channel_label"},
+    "highway.road_mileage_yearly": {"road_class": "Tee liik", "road_no": "Tee Nr"},     # + aastad y2016 -> '2016'
+    "fuel.retail_monthly": _KUTUS,
+    "fuel.retail_semimonthly": {**_KUTUS, "period": "Aruande-periood", "lpg": "LPG"},
+    "fuel.petrol_county_monthly": _MAAKONNAD,
+    "fuel.diesel_county_monthly": _MAAKONNAD,
+}
+assert len(set(DB_COL.values())) == len(CLASS_COLS) + len(SPEED_COLS) and DB_COL["=>130"] == "spd_ge130"
+
 
 def sql(query, **kw):
     """Andmebaasi päringu tulemus DataFrame'ina (COPY -> ajutine fail -> pandas.read_csv; kw = read_csv argumendid)."""
@@ -186,18 +211,29 @@ def sql(query, **kw):
 
 
 def tabel(nimi, **kw):
-    """Terve tabel, nt tabel("import_raw.labisoit")."""
-    return sql(f"SELECT * FROM {nimi}", **kw)
+    """Terve tabel koodis kasutatavate veerunimedega (VANAD_VEERUD), nt tabel("highway.road_mileage_yearly").
+    dtype võib anda koodi nimedega (nt {"id": str})."""
+    m = VANAD_VEERUD.get(nimi, {})
+    if isinstance(kw.get("dtype"), dict):
+        uus = {v: k for k, v in m.items()}
+        kw["dtype"] = {uus.get(k, k): t for k, t in kw["dtype"].items()}
+    d = sql(f"SELECT * FROM {nimi}", **kw).rename(columns=m)
+    if nimi == "highway.road_mileage_yearly":                    # aastaveerud y2016, y2017... -> '2016', '2017'...
+        d = d.rename(columns=lambda x: x[1:] if re.fullmatch(r"y\d{4}", x) else x)
+    return d
 
 
 def puhver(nimi, tabelid, f, *a, **kw):
     """f(*a, **kw) tulemus kohalikust puhvrist (db_cache/<nimi>.pkl), kui andmebaasi tabelid, funktsiooni kood ja
-    argumendid pole pärast salvestamist muutunud; muidu arvutab uuesti ja salvestab. Tabelite muutumist näitab
-    pg_stat_user_tables (lisatud, muudetud ja kustutatud ridade loendurid)."""
+    argumendid pole pärast salvestamist muutunud; muidu arvutab uuesti ja salvestab. tabelid = skeemiga nimed, nt
+    ["highway.count_hourly"]. Tabelite muutumist näitab pg_stat_user_tables (lisatud, muudetud ja kustutatud ridade
+    loendurid). Tundmatu tabelinimi on viga: muidu ei märgataks tabeli muutumist ja puhver jääks igaveseks vanaks."""
     nimed = ", ".join(f"'{t}'" for t in tabelid)
-    jalg = (sql("SELECT relname, n_tup_ins, n_tup_upd, n_tup_del FROM pg_stat_user_tables WHERE schemaname IN "
-                f"('import_raw', 'traffic') AND relname IN ({nimed}) ORDER BY 1").to_csv(index=False),
-            inspect.getsource(f), repr((a, kw)))
+    seis = sql("SELECT schemaname || '.' || relname AS tabel, n_tup_ins, n_tup_upd, n_tup_del FROM pg_stat_user_tables "
+               f"WHERE schemaname || '.' || relname IN ({nimed}) ORDER BY 1")
+    if len(seis) != len(set(tabelid)):
+        raise ValueError(f"puhver({nimi!r}): andmebaasis pole tabelit {sorted(set(tabelid) - set(seis.iloc[:, 0]))}")
+    jalg = (seis.to_csv(index=False), inspect.getsource(f), repr((a, kw)))
     fail = CACHE / f"{nimi}.pkl"
     if fail.exists():
         vana, tulem = pd.read_pickle(fail)
@@ -211,37 +247,39 @@ def puhver(nimi, tabelid, f, *a, **kw):
 
 # --- Laadimine ----------------------------------------------------------------
 def load_locations():
-    """Maanteeloendurite asukohad (traffic.counter_location): id, nimi, maakond, tee_nr, tee_nimi, tee_km, latitude,
+    """Maanteeloendurite asukohad (highway.counter): id, nimi, maakond, tee_nr, tee_nimi, tee_km, latitude,
     longitude. Lisab veeru maakond_full (nt 'Harjumaa'), mille järgi seotakse kütusemüügi tabelitega."""
-    loc = tabel("traffic.counter_location", dtype={"id": str})
-    # counter_location: 'Harju' -> kütusetabelis 'Harjumaa'
+    loc = tabel("highway.counter", dtype={"id": str})
+    # maakond 'Harju' -> kütusetabeli veerg 'Harjumaa'
     loc["maakond_full"] = loc["maakond"].str.strip() + "maa"
     loc["tee_nimi"] = loc["tee_nimi"].str.replace("�", "-", regex=False)
     return loc
 
 
-_SUMMAD = ", ".join(f'SUM("{c}") AS "{c}"' for c in CLASS_COLS + SPEED_COLS)     # tunniloenduste liitmine päringus
+_SUMMAD = ", ".join(f'SUM({DB_COL[c]}) AS "{c}"' for c in CLASS_COLS + SPEED_COLS)    # tunniloenduste liitmine päringus
 
 
 def load_hourly_profile():
     """Tunniprofiil loenduri, kanali, kuu ja päevatüübi (toopaev = E-R) kaupa: n_hours ja loenduste summad."""
-    return puhver("hourly_profile", ["hourly_count_csv"], sql,
-                  "SELECT id, kanal, EXTRACT(YEAR FROM aeg)::int AS aasta, EXTRACT(MONTH FROM aeg)::int AS kuu, "
-                  "(EXTRACT(ISODOW FROM aeg) <= 5) AS toopaev, EXTRACT(HOUR FROM aeg)::int AS tund, COUNT(*) AS n_hours, "
-                  f"{_SUMMAD} FROM import_raw.hourly_count_csv GROUP BY 1, 2, 3, 4, 5, 6 ORDER BY 1, 2, 3, 4, 5, 6",
+    return puhver("hourly_profile", ["highway.count_hourly"], sql,
+                  "SELECT counter_id AS id, channel AS kanal, EXTRACT(YEAR FROM ts)::int AS aasta, "
+                  "EXTRACT(MONTH FROM ts)::int AS kuu, (EXTRACT(ISODOW FROM ts) <= 5) AS toopaev, "
+                  "EXTRACT(HOUR FROM ts)::int AS tund, COUNT(*) AS n_hours, "
+                  f"{_SUMMAD} FROM highway.count_hourly GROUP BY 1, 2, 3, 4, 5, 6 ORDER BY 1, 2, 3, 4, 5, 6",
                   dtype={"id": str})
 
 
 def load_daily():
-    """Päevased summad kanali kaupa (tunniloendustest, import_raw.hourly_count_csv), parandatud duplikaattundide jaoks.
+    """Päevased summad kanali kaupa (tunniloendustest, highway.count_hourly), parandatud duplikaattundide jaoks.
 
     'hours' = mitu tunnirida päeval oli. 24 = korras. 2021. aastal on osa tunde
     imporditud kaks korda (46-48 rida) -> jagame summad hours/24-ga.
     23/25 = suveaja vahetuse päevad, jäävad nii nagu on.
     """
-    d = puhver("daily_count", ["hourly_count_csv"], sql,
-               f"SELECT id, kanal, aeg::date AS paev, COUNT(*) AS hours, {_SUMMAD} FROM import_raw.hourly_count_csv "
-               "GROUP BY id, kanal, aeg::date ORDER BY id, kanal, paev", dtype={"id": str}, parse_dates=["paev"])
+    d = puhver("daily_count", ["highway.count_hourly"], sql,
+               f"SELECT counter_id AS id, channel AS kanal, ts::date AS paev, COUNT(*) AS hours, {_SUMMAD} "
+               "FROM highway.count_hourly GROUP BY counter_id, channel, ts::date ORDER BY id, kanal, paev",
+               dtype={"id": str}, parse_dates=["paev"])
     dup = d["hours"] >= 44
     scale = np.where(dup, 24 / d["hours"], 1.0)
     num = CLASS_COLS + SPEED_COLS
@@ -342,7 +380,7 @@ def to_period(year, month):
 
 def _county_fuel(col):
     """Ühe kütuse (col = 'bensiin' või 'diisel') kuumüük maakonniti laiast tabelist pikaks: kuu, maakond_full, liitrid."""
-    f = tabel(f"import_raw.{col}_maakond_monthly")
+    f = tabel(f"fuel.{dict(bensiin='petrol', diisel='diesel')[col]}_county_monthly")
     f = f.melt(id_vars=["Aasta", "Kuu"], var_name="maakond_full", value_name=col)
     f["kuu"] = to_period(f["Aasta"], f["Kuu"])
     return f[["kuu", "maakond_full", col]]
@@ -359,7 +397,7 @@ def load_fuel_county():
 
 def load_fuel_national():
     """Jaemüük tanklatest, liitrit päevas. Bensiin = <98 + >98."""
-    r = tabel("import_raw.jaemuuk_tanklast_monthly").dropna()
+    r = tabel("fuel.retail_monthly").dropna()
     r["kuu"] = to_period(r["Aasta"], r["Kuu"])
     days = r["kuu"].dt.days_in_month
     out = pd.DataFrame({"kuu": r["kuu"],
@@ -404,7 +442,7 @@ KOHANIMI_VEAD = {"talinn": "tallinn", "kanam": "kanama"}     # kirjavead radade 
 
 
 def ends(label):
-    """Maanteeloenduri raja nimi (traffic.counter_channel) -> (lähtekoht, sihtkoht): '3: Tartu - Tallinn 1' -> ('tartu', 'tallinn').
+    """Maanteeloenduri raja nimi (highway.counter_channel) -> (lähtekoht, sihtkoht): '3: Tartu - Tallinn 1' -> ('tartu', 'tallinn').
     Kirjavead parandatakse (KOHANIMI_VEAD), et sama suuna rajad tuleksid kokku."""
     body = re.sub(r"^\s*\d+\s*:\s*", "", str(label)).lower()
     parts = [p.strip() for p in body.split(" - ")]
@@ -418,7 +456,7 @@ assert ends("3: Narva - Talinn 2") == ("narva", "tallinn") and ends("1: Luige - 
 
 
 def load_15m(algus="2024-08-01"):
-    """Maanteeloendurite 15 min loendused (import_raw."15m_count") alates kuupäevast, rida = loendur, kanal (rada) ja
+    """Maanteeloendurite 15 min loendused (highway.count_15min) alates kuupäevast, rida = loendur, kanal (rada) ja
     veerandtund: id, kanal, ts (veerandtunni algus) ja sõidukite arvud
       v                       kõik klassid kokku
       luhike, keskmine, pikk  pikkusrühmade kaupa (PIKKUS: klassid -> < 6 m, 6-12 m, >= 12 m)
@@ -427,12 +465,13 @@ def load_15m(algus="2024-08-01"):
                               keskmine kiirus = ks / kn (enne jagamist võib radu ja veerandtunde liita)
     Sama veerandtund kaks korda (kordusimport, kellakeeramine) = keskmine. Pikk ajalugu on Harjumaa loenduritel;
     teistel ainult üksikud päevad."""
-    summa = lambda veerud, kaal=None: " + ".join(f'"{c}"' + (f" * {kaal[c]}" if kaal else "") for c in veerud)
-    veerud = {"v": summa(CLASS_COLS), **{g: summa(k) for g, k in PIKKUS.items()}, "alla40": f'"{SPEED_COLS[0]}"',
+    summa = lambda veerud, kaal=None: " + ".join(DB_COL[c] + (f" * {kaal[c]}" if kaal else "") for c in veerud)
+    veerud = {"v": summa(CLASS_COLS), **{g: summa(k) for g, k in PIKKUS.items()}, "alla40": DB_COL[SPEED_COLS[0]],
               "ks": summa(SPEED_COLS, SPEED_MID), "kn": summa(SPEED_COLS)}
-    return puhver("15m_count", ["15m_count"], sql,
-                  "SELECT id, kanal, aeg AS ts, " + ", ".join(f"AVG({s}) AS {n}" for n, s in veerud.items())
-                  + f" FROM import_raw.\"15m_count\" WHERE aeg >= '{algus}' GROUP BY id, kanal, aeg ORDER BY id, kanal, aeg",
+    return puhver("15m_count", ["highway.count_15min"], sql,
+                  "SELECT counter_id AS id, channel AS kanal, ts, " + ", ".join(f"AVG({s}) AS {n}" for n, s in veerud.items())
+                  + f" FROM highway.count_15min WHERE ts >= '{algus}' GROUP BY counter_id, channel, ts "
+                  "ORDER BY counter_id, channel, ts",
                   dtype={"id": str, **dict.fromkeys(list(veerud)[1:], "float32")}, parse_dates=["ts"])    # v jääb täpseks
 
 
@@ -446,13 +485,13 @@ def ilma_vigaste_kuudeta(x, cm, aeg="ts"):
 
 def maantee_suunad(algus):
     """Maanteeloendurite suunad ja nende 15 min loendused alates kuupäevast `algus` (13, 20).
-    Suund (site) = loendur + raja nime otspunktid (traffic.counter_channel, nt '3: Tartu - Tallinn 1' -> 'tartu - tallinn');
+    Suund (site) = loendur + raja nime otspunktid (highway.counter_channel, nt '3: Tartu - Tallinn 1' -> 'tartu - tallinn');
     suuna rajad liidetakse ja alles jäävad veerandtunnid, kus kõik suuna rajad on olemas. Kahtlase mahuga loendur-kuud
     on väljas (ilma_vigaste_kuudeta). Tagastab (ds, dq):
       ds  site -> id, lahte, siht, nimi, tee_nr, tee_km, lat, lon
       dq  site, start (veerandtunni algus), c (sõidukeid), n (radu), alla40, ks, kn (vt load_15m), paev, slot (0..95),
           kool (õppetöö), argipaev (tööpäev, ka vaheajal), toopaev (tavaline tööpäev = mõlemad), dow (0 = esmaspäev)"""
-    chn = tabel("traffic.counter_channel", dtype={"id": str})
+    chn = tabel("highway.counter_channel", dtype={"id": str})
     chn[["lahte", "siht"]] = pd.DataFrame([ends(x) for x in chn["channel_label"]], index=chn.index)
     chn = chn[chn["lahte"] != ""]
     chn["site"] = chn["id"] + " | " + chn["lahte"] + " - " + chn["siht"]
@@ -628,23 +667,25 @@ def load_tallinn():
 
 
 def read_tallinn_raw():
-    """Toorandmed (import_raw.traffic_15min_tallinn): mp_id, ts (15 min intervalli algus), vehicles.
+    """Toorandmed (tallinn.count_15min): mp_id, ts (15 min intervalli algus), vehicles.
     Tühje ristmikke tabelis pole."""
-    return puhver("tallinn_15min", ["traffic_15min_tallinn"], sql,
-                  "SELECT mp_id, ts, vehicles FROM import_raw.traffic_15min_tallinn ORDER BY mp_id, ts", parse_dates=["ts"])
+    return puhver("tallinn_15min", ["tallinn.count_15min"], sql,
+                  "SELECT junction_id AS mp_id, ts, vehicles FROM tallinn.count_15min ORDER BY junction_id, ts",
+                  parse_dates=["ts"])
 
 
 def load_junctions():
-    """Kõigi ristmike (MP01...MP50) koodid, nimed ja koordinaadid (import_raw.tallinn_junction).
+    """Kõigi ristmike (MP01...MP50) koodid, nimed ja koordinaadid (tallinn.junction).
     Mitte-tühjade ristmike valik tehakse andmete järgi."""
-    return sql("SELECT mp_id, code, name, lat, lon FROM import_raw.tallinn_junction ORDER BY mp_id")
+    return sql("SELECT junction_id AS mp_id, junction_code AS code, name, lat, lon FROM tallinn.junction "
+               "ORDER BY junction_id")
 
 
 def load_manoeuvres():
-    """Mida iga ristmiku kanal loendab (import_raw.tallinn_detector_manoeuvre): mp, channel, direction_id, manoeuvre jm."""
-    return sql("SELECT mp, intersection, schema_file AS schema, channel, detector_id, detector_name, schema_label, "
-               "direction_id, manoeuvre, from_leg, to_leg, turn, traffic_direction, vehicles_in_hour, note "
-               "FROM import_raw.tallinn_detector_manoeuvre ORDER BY mp, channel")
+    """Mida iga ristmiku kanal loendab (tallinn.detector_channel): mp, channel, direction_id, manoeuvre jm."""
+    return sql("SELECT junction_code AS mp, intersection, schema_file AS schema, channel, detector_id, detector_name, "
+               "schema_label, direction_id, manoeuvre, from_leg, to_leg, turn, traffic_direction, vehicles_in_hour, note "
+               "FROM tallinn.detector_channel ORDER BY junction_code, channel")
 
 
 VEHICLE_DAY = "2026-09-30"   # ainus täielik ööpäev sõidukipõhistes loendustes (Traffic 24h, kolmapäev)
@@ -680,12 +721,12 @@ PUHASTUS = {}      # koik (False/True) -> mitu rida loeti ja mitu eemaldati (11_
 def _soidukid(koik):
     """Puhastatud sõidukikirjed (suunata) ja puhastuse arvud. koik=False: ainult sõidukipõhine ööpäev (VEHICLE_DAY,
     25 h nagu algsed osafailid). Elumärgid (kiirus, pikkus ja eluaegne loendur 0) jäetakse välja juba päringus."""
-    aken = "" if koik else (f" AND event_time >= '{VEHICLE_DAY}' AND event_time < '{VEHICLE_DAY}'::timestamp "
+    aken = "" if koik else (f" AND ts >= '{VEHICLE_DAY}' AND ts < '{VEHICLE_DAY}'::timestamp "
                             "+ interval '25 hours'")
-    v = sql("SELECT port, detector_id AS kanal, speed_kmh AS kiirus, length_m AS pikkus, occupancy_s AS occ, "
-            "time_gap_s AS gap, lifetime_counter AS life, event_time AS ts FROM import_raw.traffic24h_tallinn "
+    v = sql("SELECT port, channel AS kanal, speed_kmh AS kiirus, length_m AS pikkus, occupancy_s AS occ, "
+            "time_gap_s AS gap, lifetime_counter AS life, ts FROM tallinn.vehicle_passage "
             f"WHERE (speed_kmh > 0 OR length_m > 0 OR lifetime_counter > 0){aken} "
-            "ORDER BY event_time, port, detector_id, lifetime_counter, speed_kmh DESC, length_m DESC")   # kindel järjekord
+            "ORDER BY ts, port, channel, lifetime_counter, speed_kmh DESC, length_m DESC")   # kindel järjekord
     v["ts"] = pd.to_datetime(v["ts"], format="ISO8601")
     v = v.drop_duplicates(["port", "kanal", "ts"])
     # Sama järjekorranumbri (life) kordus ei ole sõiduk: loenduri arvesti ei liigu, gap = 0 ja väärtused on
@@ -695,7 +736,7 @@ def _soidukid(koik):
     v = v.drop_duplicates(["port", "kanal", "life"])
     arvud = dict(ridu=n0, korduv_number=n0 - len(v), kiirus_255=int((v["kiirus"] == 255).sum()))
     v.loc[v["kiirus"] == 255, "kiirus"] = 0
-    v = v.merge(sql("SELECT port, mp_id FROM import_raw.tallinn_serial_port"), on="port")
+    v = v.merge(sql("SELECT port, junction_id AS mp_id FROM tallinn.serial_port"), on="port")
     return v[["mp_id", "kanal", "ts", "kiirus", "pikkus", "occ", "gap", "life"]], arvud
 
 
@@ -704,7 +745,7 @@ def _vehicles_all(koik=False):
     """Puhastatud sõidukikirjed (_soidukid, kohalikust puhvrist) koos kanali suunaga (veerud LSS, LVS). Tulemus jääb
     mällu, et sama käivituse jooksul ei loetaks kaks korda; puhastuse arvud lähevad sõnastikku PUHASTUS."""
     v, PUHASTUS[koik] = puhver("soidukid_koik" if koik else f"soidukid_{VEHICLE_DAY}",
-                               ["traffic24h_tallinn", "tallinn_serial_port"], _soidukid, koik)
+                               ["tallinn.vehicle_passage", "tallinn.serial_port"], _soidukid, koik)
     if v.empty:
         return None
     v = v.merge(channel_direction(), on=["mp_id", "kanal"], how="left")
@@ -720,8 +761,8 @@ def load_vehicles(suund=SUUND, koik=False):
     gap = ajavahe eelmise sõiduki lahkumisest (s), occ = loenduril oldud aeg (s), life = loenduri
     järjekorranumber (õige järjestus). Sõidukite vahe esiotsast esiotsani = eelmise occ + gap.
 
-    Allikas import_raw.traffic24h_tallinn. koik=False: ainult sõidukipõhine ööpäev (VEHICLE_DAY); koik=True: kõik
-    päevad (ka logija nädal). 'Serial port Id' -> ristmik: import_raw.tallinn_serial_port (leitud T08
+    Allikas tallinn.vehicle_passage. koik=False: ainult sõidukipõhine ööpäev (VEHICLE_DAY); koik=True: kõik
+    päevad (ka logija nädal). 'Serial port Id' -> ristmik: tallinn.serial_port (leitud T08
     tunniloenduste võrdlusest); 'Detector ID' = ristmiku kanal (T08 "Suunad"). suund = LSS/LVS -> ainult selle
     suuna kanalid (vaikimisi SUUND; None = kõik). Tagastab None, kui kirjeid pole.
     """
@@ -781,20 +822,20 @@ def to_5min(prof15, shares):
 
 
 def load_datex_sites():
-    """DATEX II loenduskohad (import_raw.datex_site): site (UUID-1 = forwards, -2 = backwards), nimi, radu, lat, lon."""
-    return sql("SELECT site, nimi, radu, lat, lon FROM import_raw.datex_site ORDER BY site")
+    """DATEX II loenduskohad (highway.datex_site): site (UUID-1 = forwards, -2 = backwards), nimi, radu, lat, lon."""
+    return sql("SELECT site_id AS site, name AS nimi, lanes AS radu, lat, lon FROM highway.datex_site ORDER BY site_id")
 
 
 def load_datex_quarters():
-    """DATEX II 15 min aknad (import_raw.datex_15min: Tark Tee hetktõmmised ja datex_kogumine.py) -> kella veerandtunnid:
+    """DATEX II 15 min aknad (highway.datex_flow_15min: Tark Tee hetktõmmised ja datex_kogumine.py) -> kella veerandtunnid:
     site (UUID-1/-2 = suund), start (:00, :15, :30, :45), c (sõidukeid veerandtunnis).
 
     Iga tõmmis annab loenduri viimase 15 min akna (voog sõid/h, sõidukeid = voog/4). Aknad on loenduriti
     0...5 min nihkes (lõpp nt :10, :25...), seega jagatakse need kellaveerandtundideks kumulatiivse summa
     lineaarse interpoleerimisega (eeldus: ühtlane voog akna sees). Ainult katkematud aknajadad; tühimiku
     servades olevad osalised veerandtunnid jäetakse välja. Tagastab None, kui faile pole."""
-    d = sql('SELECT site, aeg AS "end", voog_h / 4.0 AS c FROM import_raw.datex_15min WHERE voog_h IS NOT NULL '
-            "ORDER BY site, aeg", parse_dates=["end"])
+    d = sql('SELECT site_id AS site, ts_end AS "end", flow_vph / 4.0 AS c FROM highway.datex_flow_15min '
+            "WHERE flow_vph IS NOT NULL ORDER BY site_id, ts_end", parse_dates=["end"])
     if d.empty:
         return None
     q, out = pd.Timedelta(minutes=15), []
