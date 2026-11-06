@@ -4,7 +4,8 @@ skriptide 06, 09 ja 10 tulemused. Jooniseid ei tee; tulemused trükitakse ekraan
 (ka LSS/LVS), 09 ja 10; uuesti siis, kui nädala kirjed on andmebaasi laetud.
 
 SISEND
-  common.load_vehicles(None, koik=True)   sõidukipõhised kirjed (ainult terved ööpäevad, >= 23 tundi andmeid)
+  common.load_vehicles(None, koik=True)   sõidukipõhised kirjed (ainult ristmiku terved päevad: kõik pordid
+                                          kaetud 05-23, common.tervetel_paevadel)
   common.load_tallinn()                   ristmike 15 min loendused (tavalise tööpäeva võrdluseks)
   valjund/09_tsuklid.csv, 09_ummikud.csv, 09_ummiku_umber.csv; valjund/LSS ja valjund/LVS/06_tipptunnid.csv
 
@@ -22,12 +23,27 @@ KONTROLLID: ARVUTUS JA VÄLJUND (kaust valjund/)
      võidu mediaani 95% usaldusvahemik (bootstrap, common.mediaani_uv).       -> 11_olulisus.csv
   6) Ühe päeva jaotuste püsivus (vajab >= 2 tervet tööpäeva): 5 min osakaalude ja LSS/LVS osakaalu standardhälve
      päevade vahel, protsendipunkti.                                           -> 11_pysivus.csv
+
+CALCULATION IN PLAIN ENGLISH
+  Only complete junction-days (every port of the junction recorded 05-23).
+  1) Completeness: every detector numbers its vehicles; lost rows = missing numbers in the sequence; share = lost /
+     (kept + lost) x 100. Also how many repeated-number rows and speed-code-255 rows load_vehicles removed.
+  2) Typical day? Junction's daily total on the per-vehicle day / its typical 2026 school-workday total, and the
+     correlation of the two 15-minute profiles.
+  3) Plausibility: % of the junction's vehicles with speed 0 or above 120 km/h, length 0 or above 25 m.
+  4) Threshold sensitivity: congestion start and end found again with 75% and 85% instead of 80% of full level; shift
+     in minutes.
+  5) Significance: Wilcoxon signed-rank test of inbound vs outbound peak start at the same junction; 95% bootstrap
+     interval of the median speed gain around congestion (rows resampled independently, so repeated observations of a
+     place make the interval rather too narrow).
+  6) Stability: standard deviation over days of the 5-minute shares and of the inbound/outbound share (percentage
+     points).
 """
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-from common import (load_vehicles, load_tallinn, five_min_shares, direction_share, ummiku_loik, ummikumask, save_table,
+from common import (tervetel_paevadel, load_vehicles, load_tallinn, five_min_shares, direction_share, ummiku_loik, ummikumask, save_table,
                     OUT_DIR, PUHASTUS, mediaani_uv)
 
 TIPUD = {"hommik": (6, 11), "õhtu": (14, 20)}
@@ -38,12 +54,13 @@ mp_nimi = lambda s: "MP" + s.astype(str).str.zfill(2)
 assert (lambda u: u[0] <= 5 <= u[1])(mediaani_uv(np.arange(11)))
 
 v = load_vehicles(None, koik=True)
+n0 = len(v)
+v = tervetel_paevadel(v).copy()                     # ainult ristmiku terved päevad (kõik pordid kaetud 05-23)
 v["paev"] = v["ts"].dt.normalize()
-tunde = v.groupby("paev")["ts"].agg(lambda s: s.dt.hour.nunique())
-v = v[v["paev"].isin(tunde[tunde >= 23].index)]                         # ainult terved ööpäevad
 paevad = sorted(v["paev"].unique())
-print(f"Terveid ööpäevi: {len(paevad)} ({', '.join(pd.Timestamp(p).strftime('%d.%m %a') for p in paevad)}); "
-      f"osalised jäeti välja: {', '.join(str(p.date()) for p in tunde[tunde < 23].index) or '-'}")
+print(f"Terveid ristmiku päevi {v.groupby(['mp_id', 'paev']).ngroups}, päevi {len(paevad)} "
+      f"({', '.join(pd.Timestamp(p).strftime('%d.%m %a') for p in paevad)}); osalise kaetusega ristmiku päevad välja "
+      f"({(n0 - len(v)) / n0 * 100:.1f}% kirjetest)")
 
 # --- 1) Terviklikkus loenduri järjekorranumbri järgi ---------------------------------------------------
 v = v.sort_values(["mp_id", "kanal", "life"])

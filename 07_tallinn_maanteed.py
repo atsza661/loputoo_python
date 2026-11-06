@@ -38,6 +38,22 @@ ARVUTUS
   Kuuindeksid (common.ratio_index, 2025 = 100): ristmikud, Harjumaa maanteeloendurid, kõik kohad koos ning maanteede
     kerged ja rasked sõidukid; korrelatsioon Harjumaa müügiindeksiga tasemes, kuumuutustes ja aastamuutustes.
 
+CALCULATION IN PLAIN ENGLISH
+  Common period 2024-08 ... 2026-08, Monday-Friday in school months (September-May).
+  Counter city and direction: a highway counter belongs to a city when it is within 20 km (straight line). The lane name
+    gives the direction: city as destination = inbound, city as origin = outbound.
+  Hourly profile = average vehicles of the counter direction in each clock hour (complete days only, at least ~60
+    workdays, suspicious months left out). A junction hour counts only when all four 15-minute slots exist.
+  Finer steps: junction 15-minute values are split into 5-minute parts by the per-vehicle day. A highway hour is split
+    into quarters by the counter's own 15-minute shares on the same days, or else by the shares of the nearest DATEX II
+    site (within 300 m; the direction is matched by the best correlation of hourly profiles).
+  Peak metrics as in 06 (start, share of day, spreading potential, traffic midpoint).
+  Daily index: a place's daily volume / the same place's 2025 average for that weekday, summed over places, x 100; a day
+    is dropped when fewer than 70% of the usual places report. Highway counter-days below 40% or above 250% of the
+    rolling weekday median are dropped. Correlation between junctions and city entry roads.
+  Monthly indexes as in 06 (2025 = 100) for junctions, Harju highway counters, both together and highway light/heavy
+    vehicles; correlated with Harju fuel sales in levels, month-on-month and year-on-year changes.
+
 VÄLJUND (kaust valjund/, suunaanalüüsis valjund/LSS või valjund/LVS)
   07_01_profiilid_linnad.png
       Näitab: tööpäeva liikluse jaotust linna sisse- ja väljasõidul linnade kaupa.

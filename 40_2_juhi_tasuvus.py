@@ -18,8 +18,26 @@ ARVUTUS
     sääst varem = viivitus(t*) - viivitus(t* - Δ), sääst hiljem = viivitus(t*) - viivitus(t* + Δ), min.
   Ajakaotuse hind (Small 1982, sõiduaja väärtuse suhtes): iga minut varem kohal = BETA (0,61) minutit sõiduaega, iga
     minut hiljem = GAMMA (2,40) minutit. Õhtul samad kaalud (varem = lahkub töölt varem, hiljem = jõuab hiljem koju).
-  Tasub = sääst >= hind. Suurim tasuv nihe = suurim Δ, mille juures tasub (0 = ei tasu ühegi nihkega). Vajalik kaal =
-    sääst / Δ: nii väike peaks juhi ajakaotuse kaal olema, et nihe Δ tasuks (paindliku tööajaga juhil väiksem).
+    Kohalejõudmise nihe arvestab säästu: Δ varem lahkudes jõuab juht Δ + sääst varem (hind BETA x (Δ + sääst)), Δ
+    hiljem lahkudes Δ - sääst hiljem (hind GAMMA x (Δ - sääst); kui sääst on suurem kui Δ, jõuab ta ikkagi varem ja
+    hind on BETA x (sääst - Δ)).
+  Tasub = sääst >= hind. Suurim tasuv nihe = suurim Δ, milleni tasub katkematult (kõik nihked 1...Δ tasuvad; 0 = ei
+    tasu juba 1 minutiga). Vajalik kaal =
+    sääst / (Δ + sääst) varem ja sääst / (Δ - sääst) hiljem: nii väike peaks juhi ajakaotuse kaal olema, et nihe Δ
+    tasuks (paindliku tööajaga juhil väiksem).
+
+CALCULATION IN PLAIN ENGLISH
+  Corridor delay at minute t = sum over the corridor's junctions of model-A delay (median over days, in minutes;
+    straight lines between 15-minute slot centres). Peak minute t* = largest corridor delay (06-10 or 14-19).
+  One driver who travelled at t* shifts alone by D = 1 ... NIHE_MAX minutes:
+    saving earlier = delay(t*) - delay(t* - D); saving later = delay(t*) - delay(t* + D).
+  Schedule cost: leaving D earlier he arrives D + saving earlier, cost = BETA x (D + saving), BETA = 0.61 minutes of
+    travel time per minute early. Leaving D later he arrives D - saving later, cost = GAMMA x (D - saving), GAMMA =
+    2.40; if the saving is larger than D he still arrives early and the cost is BETA x (saving - D).
+  Pays = saving >= cost. Largest paying shift = largest D for which every shift 1 ... D pays. Required weight = the
+    largest weight at which a shift pays: saving / (D + saving) earlier, saving / (D - saving) later. Junctions
+    needed for a 15-minute earlier shift: n x s >= BETA x (15 + n x s), so n = 15 x BETA / ((1 - BETA) x s), s =
+    saving per junction.
 
 VÄLJUND (kaust valjund/)
   40_2_01_juhi_tasuvus.png
@@ -48,12 +66,14 @@ TIPP_TXT = {"hommik": "hommik", "ohtu": "õhtu"}
 
 
 def suurim_tasuv(saast, hind):
-    """Suurim Δ (1, 2, ...), mille juures sääst >= hind; 0, kui ei tasu ühegi nihkega."""
+    """Suurim Δ (1, 2, ...), mille juures sääst >= hind kõigil nihetel 1...Δ (tasub katkematult); 0, kui ei tasu juba
+    1 minutiga."""
     ok = np.asarray(saast) >= np.asarray(hind)
-    return int(np.nonzero(ok)[0].max() + 1) if ok.any() else 0
+    return int(np.argmin(np.r_[ok, False]))
 
 
-assert suurim_tasuv([1.0, 1.5, 1.6], [0.6, 1.2, 1.8]) == 2 and suurim_tasuv([0.1], [0.6]) == 0
+assert suurim_tasuv([1.0, 1.5, 1.6], [0.6, 1.2, 1.8]) == 2 and suurim_tasuv([0.1], [0.6]) == 0 and \
+       suurim_tasuv([1.0, 0.1, 2.0], [0.6, 1.2, 1.8]) == 1          # vahepeal ei tasu -> katkeb
 set_style()
 jn = load_junctions().set_index("mp_id")
 a = sts_andmed()
@@ -70,7 +90,10 @@ for nimi, mps in KORIDORID.items():
     for tipp, (lo, hi) in AKNAD.items():
         t = lo + int(np.argmax(dk[lo:hi]))
         s_e, s_l = dk[t] - dk[t - dlt], dk[t] - dk[t + dlt]
-        h_e, h_l = BETA * dlt, GAMMA * dlt
+        # graafikukulu saabumise nihke järgi: varem lahkudes saabub Δ + sääst varem, hiljem lahkudes Δ - sääst hiljem
+        # (kui sääst on suurem kui Δ, saabub ta ikkagi varem kui soovitud -> varajase saabumise kulu)
+        h_e = BETA * (dlt + s_e)
+        h_l = np.where(dlt - s_l >= 0, GAMMA * (dlt - s_l), BETA * (s_l - dlt))
         kõverad[(nimi, tipp)] = (s_e, s_l, t, dk[t], len(mps))
         r = dict(koridor=nimi, tipp=tipp, ristmikud=" ".join(a["pa"].loc[m, "kood"] for m in mps), ristmikke=len(mps),
                  tipuaeg=hhmm(t / 60), viivitus_tipus_min=dk[t], viivitus_min_paeval_min=dk[6 * 60:20 * 60].min(),
@@ -78,9 +101,11 @@ for nimi, mps in KORIDORID.items():
                  saast_hiljem_max_min=s_l.max(), saast_hiljem_nihe=int(dlt[np.argmax(s_l)]),
                  tasub_varem_kuni_min=suurim_tasuv(s_e, h_e), tasub_hiljem_kuni_min=suurim_tasuv(s_l, h_l))
         for n in (15, 30, 60):
-            r[f"vajalik_kaal_varem_{n}"] = s_e[n - 1] / n
-            r[f"vajalik_kaal_hiljem_{n}"] = s_l[n - 1] / n
-        r["ristmikke_vaja_15min_varem"] = BETA * 15 / (s_e[14] / len(mps)) if s_e[14] > 0 else np.nan
+            # suurim kaal, mille juures nihe n tasub (hind saabumise nihke järgi, vt h_e ja h_l)
+            r[f"vajalik_kaal_varem_{n}"] = s_e[n - 1] / (n + s_e[n - 1])
+            r[f"vajalik_kaal_hiljem_{n}"] = s_l[n - 1] / (n - s_l[n - 1]) if n > s_l[n - 1] else np.inf
+        # mitu sama suurt ristmikku peaks teel olema, et 15 min varem tasuks: n s >= BETA (15 + n s)
+        r["ristmikke_vaja_15min_varem"] = (BETA * 15 / ((1 - BETA) * s_e[14] / len(mps))) if s_e[14] > 0 else np.nan
         rows.append(r)
 k = pd.DataFrame(rows)
 save_table(k.round(3), "40_2_juhi_tasuvus")

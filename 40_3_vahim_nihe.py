@@ -16,15 +16,24 @@ ARVUTUS
     hiljem (common.sts_nihete_voit). Võit = halvima tunni kiiruse kasv (A, %) või ummikuosa vähenemine (B, pp),
     päevade mediaan; linn ja iga ristmik.
   Täisvõit = suurim võit üle kõigi Δ. Vähim nihe = vähim Δ, mille juures võit on vähemalt TAIS_OSA (90%) täisvõidust.
-    Võrdluseks võit, kui samad autod kaoksid (ühistransport): nihe ei saa sellest suurem olla.
+    Võrdluseks võit, kui samad tipptunni autod kaoksid (common.stsenaarium "kadu"; mitte kogu päeva ühistranspordi
+    stsenaarium): nihe ei saa sellest suurem olla.
   Ristmik arvesse, kui tema täisvõit on vähemalt common.STS_MIN_VOIT.
+
+CALCULATION IN PLAIN ENGLISH
+  Share p per peak as in 40_1. Shift D = 15, 30, ..., 240 min, half of the moved cars earlier and half later.
+  Gain = worst-hour speed gain (A, %) or congestion share reduction (B, percentage points), median over days, for the
+    city and each junction.
+  Full gain = largest gain over all D. Smallest shift = smallest D whose gain is at least TAIS_OSA (90%) of the full
+    gain. Comparison line: the gain if the same peak-hour cars disappeared, the upper bound for moving them. Junctions
+    whose full gain is below STS_MIN_VOIT are left out.
 
 VÄLJUND (kaust valjund/)
   40_3_01_vahim_nihe.png
       Näitab: kuidas võit kasvab nihke pikkusega ja kus on vähim nihe, mis annab 90% täisvõidust.
       Kuidas: 2 x 2 paneeli; rida = mudel (A kiiruse kasv %, B ummikuosa vähenemine pp), veerg = hommik, õhtu. x =
-      nihe, min; oranž joon = linn, oranž vöönd = ristmike kvartiilid; sinine katkendjoon = võit, kui samad autod
-      kaoksid; hall vöönd = päevast päeva kõikumine (selle sees ei märka); punktiirjoon = 90% täisvõidust; punkt ja
+      nihe, min; oranž joon = linn, oranž vöönd = ristmike kvartiilid; sinine katkendjoon = võit, kui samad tipptunni
+      autod kaoksid; hall vöönd = päevast päeva kõikumine (selle sees ei märka); punktiirjoon = 90% täisvõidust; punkt ja
       silt = vähim nihe.
   40_3_02_ristmikud.png
       Näitab: vähim nihe ristmike kaupa ja kas see sõltub ristmiku päevaprofiilist (34).
@@ -80,7 +89,7 @@ for (m, tipp), g in ll.groupby(["mudel", "tipp"]):
     n = g[g["stsenaarium"] == "nihe"].sort_values("nihe_min")
     rows.append(dict(mudel=m, tipp=tipp, p=osakaal[tipp], koikumine=mura_l[(m, tipp)], taisvoit=n["tipu_voit"].max(),
                      vahim_nihe_min=vahim_nihe(n["nihe_min"], n["tipu_voit"]),
-                     voit_yt=g.loc[g["stsenaarium"] == "yt", "tipu_voit"].iloc[0]))
+                     voit_kadu=g.loc[g["stsenaarium"] == "kadu", "tipu_voit"].iloc[0]))
 kl = pd.DataFrame(rows)
 save_table(ll.merge(kl, on=["mudel", "tipp", "p"]).round(3), "40_3_vahim_nihe")
 
@@ -93,7 +102,7 @@ for (mp, m, tipp), g in rr.groupby(["mp_id", "mudel", "tipp"]):
                      tyyp=tyyp.get(mp, ""), koikumine=mura_r.get((mp, m, tipp), np.nan),
                      taisvoit=n["tipu_voit"].max(), vahim_nihe_min=vahim_nihe(n["nihe_min"], n["tipu_voit"]),
                      voit_60min=n.loc[n["nihe_min"] == 60, "tipu_voit"].iloc[0],
-                     voit_yt=g.loc[g["stsenaarium"] == "yt", "tipu_voit"].iloc[0]))
+                     voit_kadu=g.loc[g["stsenaarium"] == "kadu", "tipu_voit"].iloc[0]))
 kr = pd.DataFrame(rows)
 save_table(kr.round(3), "40_3_ristmikud")
 
@@ -110,7 +119,7 @@ for i, m in enumerate("AB"):
         ax.fill_between(q.index, q[0.25], q[0.75], color=C_ORANGE, alpha=0.15, lw=0, label="ristmikud (kvartiilid)")
         ax.plot(np.r_[0, n["nihe_min"]], np.r_[0, n["tipu_voit"]], color=C_ORANGE, lw=2.4, marker="o", ms=4,
                 label=f"linn: pool varem, pool hiljem")
-        ax.axhline(k["voit_yt"], color=C_BLUE, ls="--", lw=1.6, label="kui samad autod kaoksid (ühistransport)")
+        ax.axhline(k["voit_kadu"], color=C_BLUE, ls="--", lw=1.6, label="kui samad tipptunni autod kaoksid")
         ax.axhline(TAIS_OSA * k["taisvoit"], color=TEXT2, ls=":", lw=1.2)
         if np.isfinite(k["vahim_nihe_min"]):
             yv = n.loc[n["nihe_min"] == k["vahim_nihe_min"], "tipu_voit"].iloc[0]

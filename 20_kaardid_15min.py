@@ -23,6 +23,16 @@ ARVUTUS
   ponytail: kolmnurk osutab Tallinna keskuse poole või sealt eemale (mitte mööda teed) ja on nihutatud sõidusuunast
   paremale, et kaks suunda ei kataks teineteist; tee täpse suuna jaoks oleks vaja tee geomeetriat.
 
+CALCULATION IN PLAIN ENGLISH
+  Typical workday = Monday-Friday in school term, not a public holiday or shortened day, from ALGUS. A place is shown
+    when it has at least MIN_PAEVI such days and at least 90% of the day's quarter hours.
+  Flow = average vehicles in the quarter hour over those days x 4 (vehicles per hour).
+  Load = flow / the same place's largest quarter-hour flow on a typical day x 100 (0-100%).
+  Slow (highways only) = mean speed <= 70% of the counter's usual speed (median 06-20) or at least half the vehicles
+    below 40 km/h; marked when that happens on at least 25% of typical days.
+  Direction: of the two directions of a highway counter, the one with the larger morning (06-10) share of the day is
+    "towards the city".
+
 VÄLJUND (kaust valjund/)
   20_01_harju_00-06.png, 20_02_harju_06-12.png, 20_03_harju_12-18.png, 20_04_harju_18-24.png
       Näitab: kuidas tavalise tööpäeva liiklus Harjumaa maanteedel ja Tallinna ristmikel veerandtund-veerandtunni haaval
@@ -46,7 +56,7 @@ from matplotlib.colors import Normalize
 from matplotlib.lines import Line2D
 
 from common import (maantee_suunad, load_tallinn, load_junctions, add_basemap, to_merc, slot_label, set_style, save,
-                    save_table, C_RED, TEXT2)
+                    save_table, umarda, C_RED, TEXT2)
 
 ALGUS = "2025-09-01"                 # nagu 13: viimane õppeaasta kuni andmete lõpuni
 MIN_PAEVI = 20                       # koht kaardile, kui tavalisi tööpäevi on vähemalt nii palju
@@ -122,7 +132,7 @@ save_table(pd.concat([
                   "slot": jv.stack().index.get_level_values(1), "vool": jv.stack().values, "koormus": jk.stack().values})])
            .assign(kell=lambda z: z["slot"].map(kell))
            [["tyyp", "koht", "nimi", "suund", "lat", "lon", "kell", "vool", "koormus", "kiirus", "aeglane_osa_pct"]]
-           .rename(columns={"vool": "vool_soid_h", "koormus": "koormus_pct", "kiirus": "kiirus_kmh"}).round(2),
+           .rename(columns={"vool": "vool_soid_h", "koormus": "koormus_pct", "kiirus": "kiirus_kmh"}).pipe(umarda),
            "20_kaardiandmed_15min")
 
 # --- Kaardid -----------------------------------------------------------------------------------------------------------

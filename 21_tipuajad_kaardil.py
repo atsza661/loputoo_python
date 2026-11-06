@@ -17,6 +17,13 @@ ARVUTUS
     ööpäevane liiklus = profiili summa (märgi suurus)
   Hommikukaardil on maanteel suund linna poole, õhtukaardil linnast välja (nagu 07); ristmikud on mõlemal.
 
+CALCULATION IN PLAIN ENGLISH
+  Daily profile of each place = average vehicles in each of the 96 quarter hours (flow / 4); a single missing quarter
+    hour is filled from its neighbours.
+  Peak-hour start = start of the 60-minute window with the most vehicles, 06:00-09:59 or 14:00-18:59.
+  Traffic midpoint = average clock time weighted by vehicles, 06-10 and 15-19.
+  Marker size = daily traffic = sum of the profile.
+
 VÄLJUND (kaust valjund/)
   21_01_kaart_harju_tipptund.png, 21_02_kaart_tallinn_tipptund.png
       Näitab: mis kell algab tipptund igal Harjumaa maantee suunal ja Tallinna ristmikul.
@@ -33,7 +40,7 @@ VÄLJUND (kaust valjund/)
 import numpy as np
 import pandas as pd
 
-from common import OUT_DIR, peak_metrics, timing_map, bbox, set_style, save_table, slot_label
+from common import OUT_DIR, peak_metrics, timing_map, bbox, set_style, save_table, umarda, slot_label
 
 set_style()
 d = pd.read_csv(OUT_DIR / "20_kaardiandmed_15min.csv", encoding="utf-8-sig")
@@ -48,7 +55,7 @@ sites["id"] = np.where(sites["tyyp"] == "ristmik", sites["koht0"], sites["koht0"
 sites["koht"] = np.where(sites["tyyp"] == "ristmik", sites["koht0"] + " " + sites["nimi"].fillna(""),
                          sites["nimi"].fillna("") + " (" + sites["suund"] + ")")
 save_table(sites[["tyyp", "koht0", "nimi", "suund", "lat", "lon", "ooopaev", "hommik_algus", "hommik_soid_h", "hommik_keskaeg",
-                  "ohtu_algus", "ohtu_soid_h", "ohtu_keskaeg"]].rename(columns={"koht0": "koht"}).round(2), "21_tipuajad")
+                  "ohtu_algus", "ohtu_soid_h", "ohtu_keskaeg"]].rename(columns={"koht0": "koht"}).pipe(umarda), "21_tipuajad")
 for tyyp, suund, aeg in [("ristmik", "ristmik", "hommik"), ("maantee", "sisse", "hommik"), ("ristmik", "ristmik", "ohtu"),
                          ("maantee", "välja", "ohtu")]:
     s = sites[(sites["tyyp"] == tyyp) & (sites["suund"] == suund)]

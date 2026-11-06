@@ -14,6 +14,12 @@ ARVUTUS
     (loenduri vahetus) ei muuda linna indeksit.
   Kalender: veerg = nädal (esmaspäevast), rida = nädalapäev; iga aasta oma real.
 
+CALCULATION IN PLAIN ENGLISH
+  Junction daily total = sum of its cleaned 15-minute values (missing slots filled with the usual value), valid days
+    only. Junction level = median of its daily totals on typical workdays.
+  Day index = 100 x median over junctions of (daily total / junction level); needs at least MIN_RISTMIKKE junctions.
+    A median, not a sum, so a changing set of junctions or one junction's level shift does not move the city index.
+
 VÄLJUND (kaust valjund/)
   29_01_kalender.png
       Näitab: iga päeva liiklust võrreldes tavalise tööpäevaga kahe aasta jooksul - nädalarütm, suve- ja jõulumadal,

@@ -11,9 +11,18 @@ ARVUTUS
     ööpäev   - päevasumma
     hommik   - hommikune tipptund: suurim liikuv 60 min summa, algus 06:00...09:45
     õhtu     - õhtune tipptund: algus 14:00...18:45
-  Muutus = 2026 / 2025 - 1, %. Linn kokku = ristmike summa (ainult ristmikud, mis on mõlemas perioodis).
+  Muutus = 2026 / 2025 - 1, %. Linn kokku = ristmike mediaanide summa (ainult ristmikud, mis on mõlemas perioodis);
+    tipptunnil on igal ristmikul oma tipptund, seega see ei ole linna samaaegne tipp.
   Tasemenihe perioodi sees: kui 2026. a perioodi kahe viimase ja kahe esimese nädala päevasummade erinevus on üle
     NIHE (loenduri vahetus, rike või ehitus), on ristmik märgitud - tema muutus ei pruugi olla liikluse muutus.
+
+CALCULATION IN PLAIN ENGLISH
+  Same 4 school weeks (Mon-Fri, no holidays) in 2025 and 2026. Per junction (median over valid days, at least
+    MIN_PAEVI): daily total; morning peak hour = largest rolling 60-minute sum starting 06:00-09:45; evening = start
+    14:00-18:45.
+  Change % = (2026 value / 2025 value - 1) x 100. City total = sum of the junctions' medians (junctions present in both
+    years) - each junction at its own peak hour, so not the city's simultaneous peak.
+  Level shift flag: last two weeks vs first two weeks of 2026 daily totals differ by more than NIHE.
 
 VÄLJUND (kaust valjund/)
   30_01_aastavordlus.png
@@ -29,7 +38,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-from common import load_tallinn, load_junctions, set_style, save, save_table, short_name, C_BLUE, C_ORANGE, C_GRAY, TEXT, TEXT2
+from common import paeva_maatriks, load_tallinn, load_junctions, set_style, save, save_table, short_name, C_BLUE, C_ORANGE, C_GRAY, TEXT, TEXT2
 
 PERIOODID = {2025: ("2025-09-08", "2025-10-03"), 2026: ("2026-09-07", "2026-10-02")}
 HOMMIK, OHTU = (24, 39), (56, 75)    # tipptunni algus 06:00...09:45 ja 14:00...18:45 (15 min pilud)
@@ -54,7 +63,7 @@ rows = []
 for aasta, (a, b) in PERIOODID.items():
     dd = d[d["paev"].between(a, b)]
     tt = t[t["paev"].between(a, b)].merge(dd[["mp_id", "paev"]], on=["mp_id", "paev"])
-    w = tt.pivot_table(index=["mp_id", "paev"], columns="slot", values="v", aggfunc="sum")
+    w = paeva_maatriks(tt)            # puuduv pilu jääb NaN-iks (mitte 0)
     w = w.T.interpolate(limit_direction="both").T
     x = pd.DataFrame({"hommik": tunnitipp(w, HOMMIK), "ohtu": tunnitipp(w, OHTU)}).join(dd.set_index(["mp_id", "paev"])["summa"])
     g = x.groupby("mp_id").agg(paevi=("summa", "size"), ooopaev=("summa", "median"), hommik=("hommik", "median"),

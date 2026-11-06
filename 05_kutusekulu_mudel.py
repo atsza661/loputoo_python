@@ -2,9 +2,9 @@
 05 - Kütusekulu hinnang loenduri andmetest (sõidukiklass x kiirus) ja tipptundide lisakulu.
 
 SISEND
-  common.load_hourly_profile()           maanteeloendurite tunniprofiil: iga loenduri, kanali, kuu, päevatüübi (tööpäev
-                                         E-R või mitte) ja kellatunni kohta tunniridade arv (n_hours) ning sõidukite
-                                         summad 10 klassi ja 11 kiirusvahemiku kaupa
+  common.load_hourly_profile()           maanteeloendurite tunniprofiil täispäevadest: iga loenduri, kanali, kuu,
+                                         päevatüübi (tööpäev E-R või mitte) ja kellatunni kohta tundide arv (n_hours) ning
+                                         sõidukite summad 10 klassi ja 11 kiirusvahemiku kaupa (korduvad tunnid keskmistatud)
   common.load_daily(), counter_month()   kehtivad loendur-kuud (kahtlase mahu või klassijaotusega kuud jäävad välja)
   common.load_locations()                loenduri nimi, maakond, tee
   common.load_fuel_national()            kütuse jaemüük, liitrit päevas (võrdluseks)
@@ -12,7 +12,7 @@ SISEND
 EELDUSED (muudetavad koodi alguses)
   FC_BASE        klassi baaskulu soodsaimal kiirusel, l/100 km (ligikaudsed sõidukipargi keskmised)
   CURVE_POINTS   suhteline kulu kiirusel v: r(v) = a/v + b + c x v^2; kõver läbib kolme etteantud punkti (kerged: 30,
-                 65 ja 120 km/h; rasked: 30, 70 ja 100 km/h), miinimum = 1
+                 65 ja 120 km/h; rasked: 30, 70 ja 100 km/h), miinimum ≈ 1 (0,9987 ja 0,99995)
   Tipptunnid 7-9 ja 16-18, võrdlusaeg 10-15, profiilide aastad 2023-2025.
 
 ARVUTUS
@@ -31,10 +31,27 @@ ARVUTUS
   NB! Loendur mõõdab punktkiirust; tegelik ummikukulu (seisak, kiirendused) on tõenäoliselt suurem, seega on
   aeglustumise lisakulu alumine hinnang. Tulemus on kulu loenduri asukohas, mitte kogu riigi kütusekulu.
 
+CALCULATION IN PLAIN ENGLISH
+  Fuel for one row of the hourly profile (one counter lane, month, day type and hour), litres per km of road:
+    for each vehicle class: vehicles x base use (l/100 km) / 100 x average relative use, where
+    average relative use = sum over the speed bands of (share of vehicles in the band x r(band middle speed)).
+    The speed shares come from all classes together, because the counter does not link class and speed.
+  r(v) = a/v + b + c x v^2 through three given points; about 1 at the most economical speed.
+  Extra peak fuel: the same row recalculated with the speed shares of the same lane and month on workdays 10-15 h.
+    Extra = row fuel - that reference fuel. Split into a slowing part (bands below 60 km/h) and a speed part (60 km/h
+    and up): for each part, vehicles x base use / 100 x sum over its bands of (share now - reference share) x (r - 1).
+    Extra % = extra / reference fuel x 100.
+  Hourly profile: sums per hour over 2023-2025 workdays (complete days only). Share of the day = hour's sum / day's sum
+    x 100. l/100 km = fuel / vehicles x 100. Mean speed = sum of (vehicles in band x band middle) / vehicles counted by
+    speed; share below 50 km/h uses the same denominator.
+  Model fuel index: per lane and month, fuel sum / (hours / 24) = average litres per km per day; lanes added per
+    counter; then the traffic-index method of 02 (2023 = 100), petrol from classes 1-3, diesel from 4-10; compared with
+    sales the three ways of 02.
+
 VÄLJUND (kaust valjund/)
   05_01_kiiruskoverad.png
       Näitab: mudeli eeldust - kuidas kütusekulu sõltub kiirusest.
-      Kuidas: joondiagramm; x-telg = kiirus, km/h, y-telg = suhteline kulu (miinimum = 1). Sinine = kerged (kl 1-5, 9),
+      Kuidas: joondiagramm; x-telg = kiirus, km/h, y-telg = suhteline kulu (soodsaimal kiirusel ≈ 1). Sinine = kerged (kl 1-5, 9),
       oranž = rasked (kl 6-8, 10); punktid = etteantud kolm punkti, mida kõver läbib.
   05_02_tunniprofiil.png
       Näitab: kuidas jaotuvad tööpäeva jooksul sõidukid ja hinnanguline kütusekulu (kõik loendurid, 2023-2025).
@@ -103,7 +120,8 @@ COEF = {g: fit_curve(p) for g, p in CURVE_POINTS.items()}
 
 
 def r_of_v(group, v):
-    """Suhteline kütusekulu kiirusel v (km/h; arv või massiiv) rühma group ("kerge" või "raske") kõveralt; miinimum = 1."""
+    """Suhteline kütusekulu kiirusel v (km/h; arv või massiiv) rühma group ("kerge" või "raske") kõveralt. Kõver läbib
+    väärtust 1,00 kiirusel 65 (kerged) või 70 km/h (rasked); tegelik miinimum on 0,9987 (68 km/h) ja 0,99995 (71 km/h)."""
     a, b, c = COEF[group]
     v = np.asarray(v, dtype=float)
     return a / v + b + c * v ** 2
@@ -121,7 +139,7 @@ for g, col in [("kerge", C_BLUE), ("raske", C_ORANGE)]:
     ax.scatter(*zip(*CURVE_POINTS[g]), color=col, s=40, zorder=3, edgecolor="white")
 ax.axhline(1, color=TEXT2, lw=0.6, ls=":")
 ax.set_xlabel("Kiirus, km/h")
-ax.set_ylabel("Suhteline kütusekulu (min = 1)")
+ax.set_ylabel("Suhteline kütusekulu (soodsaimal kiirusel ≈ 1)")
 ax.set_title("Mudeli eeldus: kütusekulu sõltuvus kiirusest")
 ax.legend()
 save(fig, "05_01_kiiruskoverad")
@@ -138,6 +156,10 @@ d = load_daily()
 cm = counter_month(d)
 good = cm[~cm["maht_kahtlane"] & ~cm["klass_kahtlane"]][["id", "kuu"]]
 hp = hp.merge(good, on=["id", "kuu"])
+# kiirusjaotuseta read (sõidukid on, kiirusvahemikud tühjad) ei anna kütust 0, vaid on teadmata -> välja
+ilma_kiiruseta = (hp[CLASS_COLS].sum(axis=1) > 0) & (hp[SPEED_COLS].sum(axis=1) <= 0)
+print(f"Kiirusjaotuseta profiiliread välja: {int(ilma_kiiruseta.sum())} / {len(hp)}")
+hp = hp[~ilma_kiiruseta].reset_index(drop=True)
 
 N = hp[CLASS_COLS].to_numpy(float)
 S = hp[SPEED_COLS].to_numpy(float)
@@ -158,6 +180,7 @@ hp["kutus"] = F.sum(axis=1)
 hp["kutus_bensiin"] = F[:, [CLASS_COLS.index(c) for c in PETROL_CLASSES]].sum(axis=1)
 hp["kutus_diisel"] = F[:, [CLASS_COLS.index(c) for c in DIESEL_CLASSES]].sum(axis=1)
 hp["soidukeid"] = N.sum(axis=1)
+hp["kiirusega"] = S.sum(axis=1)          # kiirusvahemikes loetud sõidukid (~99,7% klassides loetutest)
 hp["alla50"] = hp[["<40Kph", "40-<50"]].sum(axis=1)
 
 # võrdlusstsenaarium: iga loendur-kanal-kuu tööpäeva vaikse aja (10-15) kiirusjaotus
@@ -195,13 +218,14 @@ LK = ["lisakulu", "lisakulu_aeglustumine", "lisakulu_kiirus"]
 # --- 2a) Riigi tööpäeva tunniprofiil ----------------------------------------------------
 loc = load_locations()
 w = hp[hp["toopaev"] & hp["aasta"].isin(PROFILE_YEARS)]
-# keskmine tunni kohta: summa / n_hours (n_hours loeb ka duplikaatread, seega keskmine on õige)
-prof = w.groupby("tund")[["soidukeid", "kutus", "kutus_ref", *LK, "alla50", "v_summa", "n_hours"]].sum()
+# summad tunni kaupa: profiilis on ainult täispäevad (load_hourly_profile), igaüks annab igale tunnile ühe rea, seega
+# osakaalud ööpäevast on võrdse kaaluga päevadest; kiirus ja alla 50 km/h osakaal kiirusega loetud sõidukitest
+prof = w.groupby("tund")[["soidukeid", "kiirusega", "kutus", "kutus_ref", *LK, "alla50", "v_summa", "n_hours"]].sum()
 prof["soidukite_osakaal_%"] = prof["soidukeid"] / prof["soidukeid"].sum() * 100
 prof["kutuse_osakaal_%"] = prof["kutus"] / prof["kutus"].sum() * 100
 prof["l_100km"] = prof["kutus"] / prof["soidukeid"] * 100
-prof["keskmine_kiirus"] = prof["v_summa"] / prof["soidukeid"]
-prof["alla50_%"] = prof["alla50"] / prof["soidukeid"] * 100
+prof["keskmine_kiirus"] = prof["v_summa"] / prof["kiirusega"]
+prof["alla50_%"] = prof["alla50"] / prof["kiirusega"] * 100
 for c in LK:
     prof[f"{c}_%"] = prof[c] / prof["kutus_ref"] * 100
 save_table(prof.reset_index(), "05_tunniprofiil")
@@ -254,10 +278,11 @@ save(fig, "05_03_lisakulu_tunnid")
 pk = w[w["tund"].isin(PEAK_HOURS)]
 cnt = pk.groupby(["id", "nimi", "maakond_full", "tee_nr"]).agg(
     **{c: (c, "sum") for c in LK}, kutus_ref=("kutus_ref", "sum"), kutus=("kutus", "sum"),
-    alla50=("alla50", "sum"), soidukeid=("soidukeid", "sum"), n_hours=("n_hours", "sum")).reset_index()
+    alla50=("alla50", "sum"), soidukeid=("soidukeid", "sum"), kiirusega=("kiirusega", "sum"),
+    n_hours=("n_hours", "sum")).reset_index()
 for c in LK:
     cnt[f"{c}_%"] = cnt[c] / cnt["kutus_ref"] * 100
-cnt["alla50_%"] = cnt["alla50"] / cnt["soidukeid"] * 100
+cnt["alla50_%"] = cnt["alla50"] / cnt["kiirusega"] * 100
 # liitrit teekilomeetri kohta ühe tööpäeva tipptundides (kõik suunad kokku)
 kanaleid = w.groupby("id")["kanal"].nunique()
 cnt["paevi"] = cnt["n_hours"] / len(PEAK_HOURS) / cnt["id"].map(kanaleid)

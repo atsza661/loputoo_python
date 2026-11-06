@@ -21,6 +21,14 @@ ARVUTUS
     seisukohalt: kui kõikumine on suur, ei ole tipp igal päeval sama ja "keskmise päeva" järgi tehtud nihked ei
     vasta igale päevale.
 
+CALCULATION IN PLAIN ENGLISH
+  Typical workdays from ALGUS. Fixed panel: junctions with a valid day on at least PANEEL_OSA of the days; a city day is
+    used only when every panel junction is valid. City flow = panel's 15-minute sum x 4 (vehicles per hour).
+  Fan chart: 10th, 25th, 50th, 75th and 90th percentile of each 15-minute slot over days.
+  Peak variation per junction: daily peak hour (largest rolling 60-minute sum, start 06:00-09:45 and 14:00-18:45);
+    variation = (90th percentile - 10th percentile) / median x 100. Day-to-day variation = the same after dividing each
+    day's peak by the junction's own rolling median (TASE_PAEVI workdays), which removes level shifts.
+
 VÄLJUND (kaust valjund/)
   37_01_lehvik.png
       Näitab: milline on linna tavaline tööpäev ja kui palju see päevast päeva kõigub.
@@ -41,7 +49,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-from common import (load_tallinn, load_junctions, set_style, save, save_table, short_name, slot_label, C_BLUE, C_ORANGE,
+from common import (paeva_maatriks, load_tallinn, load_junctions, set_style, save, save_table, short_name, slot_label, C_BLUE, C_ORANGE,
                     C_GRAY, TEXT, TEXT2)
 
 ALGUS = "2025-09-01"
@@ -78,7 +86,7 @@ jn = load_junctions().set_index("mp_id")
 t, d = load_tallinn()
 d = d[d["kehtiv"] & (d["paevatyyp"] == "tööpäev") & (d["vaheaeg"] == "kool") & (d["paev"] >= ALGUS)]
 t = t.merge(d[["mp_id", "paev"]], on=["mp_id", "paev"])
-w = t.pivot_table(index=["mp_id", "paev"], columns="slot", values="v", aggfunc="sum")
+w = paeva_maatriks(t)            # puuduv pilu jääb NaN-iks (mitte 0)
 w = w[w.notna().sum(axis=1) >= 88].T.interpolate(limit_direction="both").T
 paevi = d["paev"].nunique()
 

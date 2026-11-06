@@ -40,6 +40,19 @@ ARVUTUS
     madalam pilu vahel loetakse sisse), hommikul kell 05-12, õhtul 12-21.
   Näitajad: tipuaja algus, lõpp ja kestus; tipuaja sõidukite osakaal ööpäeva liiklusest; keskmine voog tipuajal.
 
+CALCULATION IN PLAIN ENGLISH
+  Profiles as in 07 (2024-08 ... 2026-08, school-month workdays): junction = average 15-minute slot; highway = the 07
+    15-minute profile (hourly profile x quarter shares).
+  Speed: junction = model A as in 06_2 (HCM delay on a 500 m stretch). Highway = measured mean speed = sum of (vehicles
+    in speed band x band middle) / vehicles with a speed, from the 15-minute counts of the same months (a slot counts
+    when it has on average at least MIN_SOIDUKEID vehicles and the direction has at least MIN_PAEVI days), otherwise
+    from the hourly profile.
+  Day-to-day noise and rush period: same rules and formulas as 06_2 (flow test or speed test against the 10th / 90th
+    percentile day-to-day noise). Highway directions with too few 15-minute days use the median noise of the other
+    highway counters.
+  Results: rush-period start, end and length; share of daily traffic inside the rush period = vehicles in its slots /
+    daily total x 100; average flow inside it.
+
 VÄLJUND (kaust valjund/)
   07_2_01_tipu_teravus.png
       Näitab: kui kaua tipuaeg kestab ja kui suur osa päeva liiklusest sellesse jääb, linnade ja suundade kaupa.
@@ -99,6 +112,7 @@ m = ilma_vigaste_kuudeta(load_15m(), cm).merge(cat[["id", "kanal", "linn", "suun
 g = (m.groupby(["id", "linn", "suund", "ts"])
      .agg(v=("v", "sum"), ks=("ks", "sum"), kn=("kn", "sum"), n=("v", "size")).reset_index())
 g = g[g["n"] == g.groupby(["id", "linn", "suund"])["n"].transform("max")]      # kõik suuna rajad olemas
+g = g[g["ts"].dt.to_period("M").between(P0, P1)]                # sama periood kui 07 voo profiil
 g["paev"] = g["ts"].dt.normalize()
 g["slot"] = g["ts"].dt.hour * 4 + g["ts"].dt.minute // 15
 kal = day_calendar(g["paev"]).set_index("paev")

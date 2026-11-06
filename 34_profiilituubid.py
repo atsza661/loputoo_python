@@ -18,6 +18,15 @@ ARVUTUS
     "õhtutipuga" (hommik/õhtu < 0,9) või "kaks teravat tippu".
   Kaugus kesklinnast = linnulennult Vabaduse väljakust (KESKLINN).
 
+CALCULATION IN PLAIN ENGLISH
+  Typical workday profile (as in 06). Shape = 30-minute sums 05:00-23:00 (36 values), each as % of the junction's daily
+    total (volume does not matter, only the split).
+  Grouping: hierarchical Ward clustering on the Euclidean distance between shapes, K = 3 groups; silhouette (-1 ... 1)
+    shows how clearly a junction belongs to its group.
+  Group names from the average shape: peak sharpness = (morning and evening top 30-minute shares) / average 30-minute
+    share 10-14; morning/evening = ratio of the two peaks. Distance from the centre = straight line from Vabaduse
+    väljak.
+
 VÄLJUND (kaust valjund/)
   34_01_profiilituubid.png
       Näitab: millised on Tallinna ristmike tööpäeva liikluse põhikujud ja kus need ristmikud asuvad.

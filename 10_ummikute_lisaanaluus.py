@@ -31,8 +31,8 @@ ANALÜÜSID: ARVUTUS JA VÄLJUND (kaust valjund/)
                               algus igal päeval, oranž punkt = lahenemine, hall riba = mediaanalgusest
                               mediaanlahenemiseni.
      10_paevade_vordlus.csv
-  4) Vool ja kiirus vaba vooluga radadel (5 min aknad): vool = sõidukeid x 12 (sõidukit tunnis), kiirus = sõidukite
-     keskmine. Läbilaskevõime = voolu 99. protsentiil; kiirus läbilaskevõimel = mediaankiirus, kui vool on >= 95% sellest.
+  4) Vool ja kiirus vaba vooluga radadel (5 min aknad): vool = sõidukeid x 12 (sõidukit tunnis), kiirus = kiirusega
+     sõidukite keskmine (09 kiiruste summa / kiirusega sõidukid; mitte kõigi sõidukitega kaalutud). Läbilaskevõime = voolu 99. protsentiil; kiirus läbilaskevõimel = mediaankiirus, kui vool on >= 95% sellest.
      10_05_vool_kiirus.png   hajuvusdiagrammid kuni 9 suurima manöövri kohta; punkt = 5 min, x = vool, y = kiirus, värv =
                           kellaaeg. Püstine katkendjoon = läbilaskevõime, oranž katkendjoon = 70% vabast kiirusest.
      10_vool_kiirus.csv
@@ -71,6 +71,24 @@ ANALÜÜSID: ARVUTUS JA VÄLJUND (kaust valjund/)
      10_linna_koonddiagramm.csv
   ponytail: rohelise algust ei tea, seega stardikadu on ilma esimese sõiduki reageerimisajata ja "hooga" on suhteline
   (manöövri enda kiirete sõidukite suhtes); täpsemaks on vaja foorikavasid.
+
+CALCULATION IN PLAIN ENGLISH
+  1) Free room around congestion: free room = full level x (1 - fill) / 4 vehicles, fill = the 15-minute window's
+     average throughput / full level; compared with full level / 4 = vehicles passing in 15 minutes of congestion.
+  2) Saturation per junction and quarter hour = vehicles that moved in full cycles / all vehicles x 100.
+  3) Day comparison: minimum, median, maximum and standard deviation of congestion start and end over workdays.
+  4) Free-flow lanes, 5-minute windows: flow = vehicles x 12 (per hour); speed = sum of measured speeds / vehicles with
+     a speed. Capacity = 99th percentile of flow; speed at capacity = median speed when flow >= 95% of capacity.
+  5) Queue discharge: headway = previous vehicle's time on the detector + the gap to it, in detector-number order; a
+     vehicle is in the queue while its gap is <= 4 s. Saturation headway = median headway of the 5th and later queue
+     positions; saturation flow per lane = 3600 / saturation headway; start-up loss = sum over vehicles 2-4 of (their
+     headway - saturation headway).
+  6) Long vehicles (>= 7.5 m): share per 30 minutes. Car equivalent = (headway of the long vehicle + headway of the car
+     behind it) / normal car-behind-car headway - 1.
+  7) "With momentum" = share of vehicles that pass at >= 80% of the movement's free speed (85th percentile speed).
+  8) City as one point (5-minute windows 06-20): flow per lane per hour vs density from the vehicles' 1/speed per unit
+     time and lane; city throughput as % of its 99th percentile vs share of vehicles in full cycles.
+  Only complete junction-days (every port recorded 05-23).
 """
 import numpy as np
 import pandas as pd
@@ -79,7 +97,7 @@ import matplotlib.patheffects as pe
 import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap
 
-from common import (load_vehicles, load_junctions, add_basemap, to_merc, save, save_table, set_style, short_name,
+from common import (tervetel_paevadel, load_vehicles, load_junctions, add_basemap, to_merc, save, save_table, set_style, short_name,
                     slot_label, OUT_DIR, load_manoeuvres, C_BLUE, C_ORANGE, C_AQUA, C_GRAY, TEXT2)
 
 PIKK_M = 7.5          # pikk sõiduk (veok, buss), m
@@ -254,7 +272,7 @@ else:
 
 # --- 4) Vool ja kiirus vaba vooluga radadel ---------------------------------------------------------------
 f = c[c["meetod"] == "vaba"].assign(viis=lambda q: (q["t"] // 300).astype(int))
-f["kv"], f["nk"] = (f["kiirus"] * f["n"]).fillna(0), f["n"].where(f["kiirus"].notna(), 0)
+f["kv"], f["nk"] = f["ks"].fillna(0), f["kn"].fillna(0)          # kiiruste summa ja kiirusega sõidukid (09)
 f5 = f.groupby(KEY + ["paev", "viis"])[["n", "kv", "nk"]].sum().reset_index()
 f5["voog"], f5["kiirus"] = f5["n"] * 12, f5["kv"] / f5["nk"].where(f5["nk"] > 0)
 f5 = f5.dropna(subset=["kiirus"])
@@ -294,7 +312,7 @@ save(fig, "10_05_vool_kiirus")
 
 # --- Sõidukid tsüklitesse (5-7) ---------------------------------------------------------------------------
 print("\nLaen sõidukipõhised loendused...")
-v = load_vehicles(None, koik=True)
+v = tervetel_paevadel(load_vehicles(None, koik=True))      # ristmiku terved päevad
 dm = load_manoeuvres()
 dm = dm.assign(mp_id=dm["mp"].str[2:].astype(int)).rename(columns={"channel": "kanal"})
 v = v.merge(dm[["mp_id", "kanal", "mp", "direction_id"]], on=["mp_id", "kanal"]).dropna(subset=["direction_id"])

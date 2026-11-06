@@ -5,21 +5,35 @@ loenduri liiklus oma maakonna kütusemüüki.
 SISEND
   common.load_daily(), counter_month(), clean()     kehtivad loendur-kuud ilma kahtlaste kuudeta
   common.load_locations()                           loenduri tee, maakond ja koordinaadid
-  highway.road_mileage_yearly                       põhimaanteede aastane läbisõit, mln sõidukikilomeetrit
+  highway.road_mileage_yearly                       riigiteede aastane läbisõit, mln sõidukikilomeetrit (põhimaanteed
+                                                    eraldi, tugi- ja kõrvalmaanteed kokku)
   common.load_fuel_county(), load_fuel_national()   kütusemüük maakonniti ja riigis kokku, liitrit päevas
   common.add_basemap()                              kaardi satelliit-/ortofototaust (internetita joonistatakse ilma)
 
 ARVUTUS
-  a) Läbisõit vs loendurite liiklus. Loenduri aasta keskmine ööpäevane liiklus = kuude keskmine; arvesse lähevad
-     loendur-aastad, kus kehtivaid kuid on >= 10. Tee aasta väärtus = tee loendurite keskmine. Arvutuslik tee pikkus =
-     läbisõit / (ööpäevane liiklus x 365): kui loendurid asuvad tee koormatumates kohtades (linnade lähedal), tuleb
-     see tegelikust lühem.
+  a) Läbisõit vs loendurite liiklus. Loenduri aasta keskmine ööpäevane liiklus = kuude ööpäevase liikluse keskmine,
+     kaalutud kuu päevade arvuga; arvesse lähevad loendur-aastad, kus kehtivaid kuid on >= 10. Tee aasta väärtus = tee
+     loendurite keskmine. Arvutuslik tee pikkus = läbisõit / (ööpäevane liiklus x aasta päevade arv, 365 või 366): kui
+     loendurid asuvad tee koormatumates kohtades (linnade lähedal), tuleb see tegelikust lühem.
   b) Aastased muutused. Iga tee ja aasta kohta võetakse ainult loendurid, mis on olemas ka eelmisel aastal, ja
      leitakse muutus ln(summa / eelmise aasta summa) x 100; läbisõidu muutus samal kujul.
   c) Iga loendur vs oma maakonna kütus. Loenduritel, millel on >= 36 kehtivat kuud, leitakse aastaste muutuste
      korrelatsioon: kerged sõidukid vs maakonna bensiinimüük ja kaubikud-veokid-bussid vs diislimüük.
   d) Riigi aastane läbisõit vs aastane kütusemüük (ainult täielikud aastad): liitrit 100 sõidukikilomeetri kohta.
-     Kirjeldav, sest aastaid on vähe.
+     Kirjeldav, sest aastaid on vähe. Läbisõidu tabelis on ainult riigiteed (12 põhimaanteed eraldi, tugi- ja
+     kõrvalmaanteed kokku), mitte linnatänavad, seega on see suhtarv, mitte sõidukipargi tegelik kütusekulu.
+
+CALCULATION IN PLAIN ENGLISH
+  a) Counter's yearly average daily traffic = sum over its valid months of (month's average daily traffic x days in the
+     month) / sum of those days; counter-years with at least 10 valid months only. Road value = mean of the road's
+     counters. Implied road length = yearly mileage (million vehicle-km x 1 000 000) / (average daily traffic x days in
+     the year).
+  b) Year-on-year change per road: only counters that exist in both years; change = 100 x ln(this year's sum / last
+     year's sum). The same formula for mileage.
+  c) For counters with at least 36 valid months: correlation of year-on-year changes, light vehicles vs the county's
+     petrol sales and heavy vehicles vs the county's diesel sales.
+  d) Country: litres sold in a full year / (state-road mileage x 1 000 000) x 100 = litres per 100 vehicle-km. Mileage
+     covers state roads only (not city streets), so this is a ratio, not the real fuel use of the fleet.
 
 VÄLJUND (kaust valjund/)
   04_01_labisoit_vs_adt.png
@@ -70,15 +84,17 @@ lab = lab.melt(id_vars=["Tee liik", "Tee Nr", "tee_nr"], var_name="aasta", value
 lab["aasta"] = lab["aasta"].astype(int)
 
 # loenduri aasta-ADT: ainult loendur-aastad, kus >= 10 kehtivat kuud
-cy = (cm_ok.groupby(["id", "tee_nr", "aasta"])
-      .agg(kuid=("kuu", "nunique"), adt=("kokku", "mean")).reset_index())
+cm_ok = cm_ok.assign(paevi_kuus=cm_ok["kuu"].dt.days_in_month, soidukid_kuus=lambda z: z["kokku"] * z["paevi_kuus"])
+cy = (cm_ok.groupby(["id", "tee_nr", "aasta"])          # kuu ADT kaalutud päevade arvuga (veebruar lühem)
+      .agg(kuid=("kuu", "nunique"), s=("soidukid_kuus", "sum"), p=("paevi_kuus", "sum")).reset_index()
+      .assign(adt=lambda z: z["s"] / z["p"]).drop(columns=["s", "p"]))
 cy = cy[cy["kuid"] >= 10]
 road_y = (cy.groupby(["tee_nr", "aasta"])
           .agg(adt=("adt", "mean"), loendureid=("id", "nunique")).reset_index())
 ry = road_y.merge(lab, on=["tee_nr", "aasta"])
 # arvutuslik pikkus: läbisõit / (ADT * 365). Kui loendurid asuvad tee koormatumates
 # kohtades (linnade lähedal), tuleb pikkus tegelikust lühem.
-ry["arvutuslik_pikkus_km"] = ry["mln_skm"] * 1e6 / (ry["adt"] * 365)
+ry["arvutuslik_pikkus_km"] = ry["mln_skm"] * 1e6 / (ry["adt"] * (365 + pd.to_datetime(ry["aasta"].astype(str)).dt.is_leap_year))
 save_table(ry, "04_labisoit_vs_adt")
 
 ref = ry[ry["aasta"] == 2023]

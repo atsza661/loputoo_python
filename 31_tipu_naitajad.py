@@ -18,6 +18,13 @@ ARVUTUS
                  veerandtunnis; väike PHF = terav lühike tipp (nt kooli algus).
   Tipu iseloom: hommik / õhtu = hommikuse ja õhtuse tipptunni suhe (> 1,1 hommikutipuga, < 0,9 õhtutipuga).
 
+CALCULATION IN PLAIN ENGLISH
+  Typical workdays from ALGUS (at least MIN_PAEVI). Peak metrics are computed for each day separately and the junction
+    value is the median over days (a PHF from the averaged profile would be too high, averaging smooths the quarter
+    hours). Peak start and traffic midpoint come from the average profile, comparable with 06.
+  K-factor = peak-hour volume / daily volume x 100. PHF = peak-hour volume / (4 x its busiest quarter hour).
+  Peak type: morning / evening peak-hour ratio (> 1.1 morning peak, < 0.9 evening peak).
+
 VÄLJUND (kaust valjund/)
   31_01_tipu_naitajad.png
       Näitab: kui terav (K-tegur, PHF) ja kui suur on iga ristmiku hommikune ja õhtune tipp ning kumb on suurem.
@@ -35,7 +42,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-from common import (load_tallinn, load_junctions, peak_metrics, set_style, save, save_table, short_name, place_labels,
+from common import (paeva_maatriks, load_tallinn, load_junctions, peak_metrics, set_style, save, save_table, short_name, place_labels,
                     C_BLUE, C_ORANGE, C_GRAY, TEXT2, GRID)
 
 ALGUS = "2025-09-01"
@@ -54,7 +61,7 @@ prof = t.pivot_table(index="mp_id", columns="slot", values="v", aggfunc="mean")
 n = ok.groupby("mp_id").size()
 prof = prof[(n.reindex(prof.index) >= MIN_PAEVI) & prof.notna().all(axis=1)]
 r = pd.DataFrame([peak_metrics(prof.loc[mp].values) for mp in prof.index], index=prof.index)
-w = t[t["mp_id"].isin(prof.index)].pivot_table(index=["mp_id", "paev"], columns="slot", values="v", aggfunc="sum")
+w = paeva_maatriks(t[t["mp_id"].isin(prof.index)])            # puuduv pilu jääb NaN-iks (mitte 0)
 w = w[w.notna().sum(axis=1) >= 88].T.interpolate(limit_direction="both").T
 pv = pd.DataFrame([peak_metrics(x) for x in w.values], index=w.index)
 arv = [c for c in pv.columns if c.endswith(("_soid_h", "_osakaal_%", "_phf", "_laius_min", "_potentsiaal_%")) or c == "ooopaev"]

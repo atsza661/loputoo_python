@@ -22,10 +22,20 @@ ARVUTUS
      eraldi ööpäeva, hommiku (06-10) ja õhtu (15-19) kohta. Kokkuvõte = mediaan üle loendur-vaheaeg paaride ja selle 95%
      usaldusvahemik (bootstrap, common.mediaani_uv). Tunni kaupa: kõigi loendurite ja vaheaegade summade suhe.
   B) Pikkusrühmade osakaal kellaaja järgi: maanteedel õppetöö-tööpäevade keskmine, ristmikel sõidukipõhiste päevade
-     järgi (ainult terved tööpäevad). Kui sõidukipõhiseid päevi on nii õppetöö kui ka koolivaheaja ajast, trükitakse
+     järgi (ainult ristmiku terved tööpäevad: kõik pordid kaetud 05-23). Kui sõidukipõhiseid päevi on nii õppetöö kui ka koolivaheaja ajast, trükitakse
      sama muutus ka ristmike kohta (kõik ristmikud kokku); muidu jääb see ootama vaheaja nädala andmeid.
   ponytail: võrdlus on vaatluslik (enne-pärast), ilm ja pühade-eelsed päevad võivad üksikut vaheaega mõjutada - seepärast
   mitu vaheaega koos. Ristmikel võib tihedas järjekorras kaks sõidukit mõõtuda ühe pikana.
+
+CALCULATION IN PLAIN ENGLISH
+  Length groups: highway classes 1, 2, 4, 9 = under 6 m; 3, 5, 6, 10 = 6-12 m; 7, 8 = over 12 m (an estimate from the
+    class). Junctions measure the length of each vehicle.
+  A) Highways: lanes added (quarter hours with all lanes), quarters added to hours, complete days only. For each short
+     school holiday and counter: change % = (holiday average volume / average of school workdays 14 days before and
+     after - 1) x 100, per length group, for the day, 06-10 and 15-19. Summary = median over counter-holiday pairs with
+     a 95% bootstrap interval. By hour: sum over all counters and holidays / sum of the reference days.
+  B) Share of each length group by clock time = group vehicles / all vehicles x 100: highways from school-workday
+     averages, junctions from complete per-vehicle junction-days (every port recorded 05-23).
 
 VÄLJUND (kaust valjund/)
   14_01_pikkusruhmad_vaheaeg.png
@@ -46,7 +56,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from common import (load_15m, load_daily, counter_month, ilma_vigaste_kuudeta, load_locations, load_vehicles, day_calendar,
+from common import (tervetel_paevadel, load_15m, load_daily, counter_month, ilma_vigaste_kuudeta, load_locations, load_vehicles, day_calendar,
                     mediaani_uv, set_style, save, save_table, PIKKUS, PIKKUS_PIIRID, PIKKUS_LABEL,
                     C_BLUE, C_ORANGE, C_AQUA, TEXT2)
 
@@ -126,8 +136,7 @@ v = load_vehicles(None, koik=True)
 if v is not None:
     v = v[v["pikkus"] > 0].assign(paev=lambda z: z["ts"].dt.normalize(), tund=lambda z: z["ts"].dt.hour)
     v["ryhm"] = pd.cut(v["pikkus"], PIKKUS_PIIRID, labels=RYHMAD, right=False)
-    tunde = v.groupby("paev")["tund"].nunique()
-    v = v[v["paev"].isin(tunde.index[tunde >= 23])]                       # ainult terved ööpäevad
+    v = tervetel_paevadel(v)                                          # ristmiku terved päevad (kõik pordid kaetud)
     rk = day_calendar(v["paev"]).set_index("paev")
     rp = v.groupby(["paev", "ryhm"], observed=True).size().unstack("ryhm")[RYHMAD].join(rk[["paevatyyp", "vaheaeg"]])
     save_table(rp.reset_index().assign(paev=lambda z: z["paev"].dt.date), "14_ristmikud_pikkus")

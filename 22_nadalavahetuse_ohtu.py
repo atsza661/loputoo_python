@@ -22,6 +22,13 @@ ARVUTUS
   Maantee suund on linna poole või linnast välja tööpäevade järgi (20); nädalavahetusel näidatakse mõlemat suunda, sest
   pühapäeva õhtul on põhivoog linna poole (tagasitulek), mitte välja nagu tööpäeval.
 
+CALCULATION IN PLAIN ENGLISH
+  Weekend day = Saturday or Sunday in school term, not a public holiday, from ALGUS. Profile = average vehicles per
+    quarter hour, Saturdays and Sundays separately (at least MIN_PAEVI days and 90% of quarter hours; a single gap is
+    filled from neighbours).
+  Peak-hour start = start of the 60-minute window with the most vehicles that starts 12:00-20:59; traffic midpoint =
+    vehicle-weighted average clock time 12-21; marker size = average of Saturday and Sunday daily traffic.
+
 VÄLJUND (kaust valjund/)
   22_01_kaart_harju_tipptund.png, 22_02_kaart_tallinn_tipptund.png
       Näitab: mis kell algab laupäeva ja pühapäeva pärastlõuna- või õhtutipp igal Harjumaa maantee suunal ja Tallinna
@@ -40,7 +47,7 @@ import numpy as np
 import pandas as pd
 
 from common import (maantee_suunad, load_tallinn, load_junctions, day_calendar, peak_hour, timing_map, bbox, ramp,
-                    slot_label, set_style, save_table, OUT_DIR)
+                    slot_label, set_style, save_table, umarda, OUT_DIR)
 
 ALGUS = "2025-09-01"                 # nagu 13, 20 ja 21
 MIN_PAEVI = 10                       # koht arvesse, kui laupäevi (pühapäevi) on vähemalt nii palju
@@ -102,7 +109,7 @@ for veerg, maantee, ristmik in [("lat", ds["lat"], jn["lat"]), ("lon", ds["lon"]
 sites["id"] = sites["koht"].map(lambda k: str(k)[:5]).where(mt, sites["koht"].map(jn["code"]))
 sites["koht"] = (sites["nimi"] + " (" + sites["suund"] + ")").where(mt, sites["id"] + " " + sites["nimi"])
 sites["ooopaev"] = sites[[f"{p}_ooopaev" for p in PAEVAD]].mean(axis=1)
-save_table(sites.drop(columns=["ooopaev"]).round(2), "22_nadalavahetuse_tipuajad")
+save_table(sites.drop(columns=["ooopaev"]).pipe(umarda), "22_nadalavahetuse_tipuajad")
 for paev, nimi in PAEVAD.items():
     for t_, s_ in [("ristmik", "ristmik"), ("maantee", "sisse"), ("maantee", "välja")]:
         s = sites[(sites["tyyp"] == t_) & (sites["suund"] == s_)]

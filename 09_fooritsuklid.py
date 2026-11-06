@@ -23,8 +23,10 @@ ARVUTUS
      radadel) mediaanpikkus tihedaimal 2 tunnil on vähemalt 4x see, mida annaks sama tihe juhuslik liiklus -, on
      tsükkel pausist pausini (30...240 s).
   3) "vaba" - vaba vool (Laagna tee, viaduktid, vabad parempöörded jm): 60 s aknad.
+  Andmed: ainult ristmiku terved päevad (kõik pordid kaetud 05-23, common.tervetel_paevadel).
   Ummik fooriga manöövril (kindel, paus; common.ummikumask). Läbilase = sõidukit tunnis (n x 3600 / T, võrreldav ka
-     foorikava vahetumisel), silutud 5 tsükli liikuva mediaaniga. Täistase = selle tipuakna (hommik 06-11, õhtu 14-20)
+     foorikava vahetumisel), silutud 5 tsükli liikuva mediaaniga. Silumine ja ummik ei ulatu üle augu: eemaldatud
+     tsükkel või andmelünk üle 60 s alustab uue lõigu. Täistase = selle tipuakna (hommik 06-11, õhtu 14-20)
      suurim väärtus (päevade mediaan). Ummik = silutud läbilase on vähemalt 80% täistasemest. Lühike vajumine - kuni 2
      järjestikust andmepunkti (tsüklit), mitte alla 75% täistasemest -, mille järel läbilase tõuseb tagasi 80% peale,
      ei katkesta ummikut; pikem või sügavam vajumine lõpetab selle (liiklus on rahunenud). Tipuakna ummik = lõik, mis
@@ -52,9 +54,28 @@ ARVUTUS
      kiirus <= 10 km/h või seisis loenduril (kiirus 0, loenduril >= 5 s).
   Kiirus ummiku ümber: 15 min aknad 0-15, 15-30, 30-45, 45-60 min enne ummiku algust ja pärast lõppu (nihe -15 = 0-15
      min enne, +15 = 0-15 min pärast jne). Kiiruse võit = akna keskmine kiirus - kiirus ummikus. Ajavõit sõiduki
-     kohta = 3600/kiirus ummikus - 3600/kiirus aknas (s/km); tsükli kohta = x sõidukeid täis tsüklis.
+     kohta = 3600/kiirus ummikus - 3600/kiirus aknas (s/km); tsükli kohta = x sõidukeid täis tsüklis. Kiirused on
+     punktkiiruste keskmised ja keskmise kiiruse pöördväärtus ei ole keskmine sõiduaeg, seega on ajavõit hinnang.
+  Seisakuminutid päevas (09_manoovrid) = manöövri seisakuminutid / manöövri enda mõõdetud tööpäevade arv.
   ponytail: kiirus on loenduri punktkiirus (mitte sõiduaeg) ja "täis" tuletatakse ainult loendusest; täpsem oleks
   rohelise lõpuni kestev küllastusvoog või foorikavad.
+
+CALCULATION IN PLAIN ENGLISH
+  Only junction-days on which every port of the junction was recorded 05-23.
+  Cycles: the vehicle times of a movement are folded by each candidate cycle length T = 40-180 s (time modulo T); the T
+    with the most uneven folded pattern is the fixed signal cycle. Adaptive signals: a cycle runs from one red pause (a
+    gap of at least 8 s on all lanes) to the next. Free-flow lanes: 60-second windows.
+  Throughput = vehicles in the cycle x 3600 / cycle length (vehicles per hour), smoothed by the median of 5 cycles in a
+    row; a removed cycle or a data gap over 60 s starts a new stretch, and smoothing never crosses it.
+  Full level = the largest smoothed throughput in the peak window (morning 06-11, evening 14-20), median over days.
+  Congestion (signal) = smoothed throughput >= 80% of full level; a dip of up to 2 cycles that stays at or above 75%
+    does not end it. Free flow: congestion = smoothed speed <= 70% of free speed (85th percentile of smoothed speed).
+  Occupancy H = time vehicles spent on the detector in the cycle (each at most 60 s) / (cycle length x lanes).
+    Stoppage = throughput < 80% of full level AND H >= max(H at full level, 10%), stretches of at least 10 minutes.
+    Stoppage minutes per day = the movement's stoppage minutes / the movement's own measured workdays.
+  Around congestion: speed gain = average speed in a 15-minute window before or after - speed in congestion; time gain
+    per vehicle = 3600 / congestion speed - 3600 / window speed (s per km). Speeds are averages of point speeds at the
+    stop line, so the time gain is an estimate, not a measured travel time.
 
 VÄLJUND (kaust valjund/)
   09_01_naited.png (kindel tsükkel), 09_02_naited_adaptiivne.png (adaptiivne foor)
@@ -102,7 +123,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from common import (load_vehicles, save, save_table, set_style, short_name, slot_label, loigud, ummiku_loik, ummikumask,
+from common import (tervetel_paevadel, load_vehicles, save, save_table, set_style, short_name, slot_label, loigud, ummiku_loik, ummikumask,
                     load_manoeuvres, OUT_DIR, C_BLUE, C_ORANGE, C_GRAY, C_RED, TEXT2)
 
 # --- Seaded (kalibreeritavad) --------------------------------------------------------------------------
@@ -197,7 +218,7 @@ assert seisakumask([50, 50, 90, 50, 50], [100, 100, 100, 100, np.nan], [.2, .05,
 
 set_style()
 print("Laen sõidukipõhised loendused...")
-v = load_vehicles(None, koik=True)
+v = tervetel_paevadel(load_vehicles(None, koik=True))      # ristmiku terved päevad (kõik pordid kaetud 05-23)
 dm = load_manoeuvres()
 dm = dm.assign(mp_id=dm["mp"].str[2:].astype(int)).rename(columns={"channel": "kanal"})
 v = v.merge(dm[VOTI + ["kanal"]], on=["mp_id", "kanal"]).dropna(subset=["direction_id"])
@@ -299,11 +320,15 @@ c = pd.concat(osad, ignore_index=True)
 c["kiirus"] = c["ks"] / c["kn"].where(c["kn"] > 0)
 c["q"] = c["n"] * 3600 / c["T"]                                        # läbilase, sõidukit tunnis
 sile = lambda s: s.rolling(5, center=True, min_periods=3).median()
-c["sile"] = c.groupby(VOTI + ["paev"])["q"].transform(sile)
-c["kiirus_sile"] = c.groupby(VOTI + ["paev"])["kiirus"].transform(sile)
+# järjestikused tsüklid ühes lõigus; auk (eemaldatud tsükkel või andmelünk üle 60 s) alustab uue lõigu, et silumine ega
+# ummik ei ulatuks üle mõõtmata aja
+c["loik"] = (c["t"] - c.groupby(VOTI + ["paev"])["t"].shift() - c.groupby(VOTI + ["paev"])["T"].shift()).gt(60) \
+    .groupby([c[k] for k in VOTI + ["paev"]]).cumsum()
+c["sile"] = c.groupby(VOTI + ["paev", "loik"])["q"].transform(sile)
+c["kiirus_sile"] = c.groupby(VOTI + ["paev", "loik"])["kiirus"].transform(sile)
 # hõivatus: osa tsükli ajast, mil loendur on sõidukiga kaetud (raja kohta) - tiheduse mõõt
 c["hoivatus"] = c["occ"] / (c["T"] * man["radu"].reindex(pd.MultiIndex.from_frame(c[VOTI])).values)
-c["hoivatus_sile"] = c.groupby(VOTI + ["paev"])["hoivatus"].transform(sile)
+c["hoivatus_sile"] = c.groupby(VOTI + ["paev", "loik"])["hoivatus"].transform(sile)
 c["tyyp"] = np.where(c["paev"].dt.dayofweek < 5, "tööpäev", "nädalavahetus")
 man["vaba_kiirus"] = c[c["meetod"] == "vaba"].groupby(VOTI)["kiirus_sile"].quantile(0.85)
 for tipp, (a, b) in TIPUD.items():
@@ -327,7 +352,7 @@ c["pool"] = np.where(c["t"] < 12.5 * 3600, *TIPUD)
 c = c.merge(tase.rename("taistase").reset_index().rename(columns={"tipp": "pool"}), on=VOTI + ["tyyp", "pool"], how="left")
 c = c.merge(man[["vaba_kiirus"]], left_on=VOTI, right_index=True, how="left")
 ummikus = (c["kiirus_sile"] <= VABA_KIIRUS * c["vaba_kiirus"]).to_numpy(copy=True)
-for (mp, did, paev), ix in c.groupby(VOTI + ["paev"]).indices.items():
+for (mp, did, paev, _), ix in c.groupby(VOTI + ["paev", "loik"]).indices.items():      # ummik ei ulatu üle augu
     if c["meetod"].values[ix[0]] != "vaba":
         ummikus[ix] = ummikumask(c["sile"].values[ix], c["taistase"].values[ix], ALGUS, PUSIB, VAJUMINE, c["kiirus"].values[ix],
                                  c["kn"].values[ix], man.at[(mp, did), "kiirus_keskmine"] if KIIRUSTEST else None)
@@ -339,8 +364,9 @@ c = c.join(tais, on=VOTI + ["tyyp", "pool"])
 c["seisak"] = seisakumask(c["sile"], c["taistase"], c["hoivatus_sile"], c["hoivatus_tais"])
 save_table(c.assign(algus=(c["paev"] + pd.to_timedelta(c["t"].round(), unit="s")).dt.strftime("%Y-%m-%d %H:%M:%S"),
                     mp="MP" + c["mp_id"].astype(str).str.zfill(2), t=np.floor(c["t"] * 1000) / 1000)
-           [["mp", "direction_id", "meetod", "algus", "t", "T", "n", "kiirus", "taistase", "ummikus", "hoivatus", "seisak"]]
-           .round({"T": 1, "kiirus": 1, "taistase": 1, "hoivatus": 3}), "09_tsuklid")
+           [["mp", "direction_id", "meetod", "algus", "t", "T", "n", "ks", "kn", "kiirus", "taistase", "ummikus", "hoivatus",
+             "seisak"]]
+           .round({"T": 1, "ks": 1, "kiirus": 1, "taistase": 1, "hoivatus": 3}), "09_tsuklid")
 
 hms = lambda t: slot_label(t / 60, 60)
 ummikud, umber, seisakud = [], [], []
@@ -427,7 +453,8 @@ sei = pd.DataFrame(seisakud).merge(man[["mp", "manoeuvre", "kiirus_keskmine"]], 
 save_table(sei[ees + [x for x in sei.columns if x not in ees + ["mp_id"]]].assign(paev=sei["paev"].dt.date).round(2), "09_seisakud")
 seit = sei[(sei["tyyp"] == "tööpäev") & (sei["tipp"] != "muu aeg")]
 man["seisakupaevi"] = seit.groupby(VOTI)["paev"].nunique()
-man["seisak_min_paevas"] = seit.groupby(VOTI)["kestus_min"].sum() / c.loc[c["tyyp"] == "tööpäev", "paev"].nunique()
+man["seisak_min_paevas"] = (seit.groupby(VOTI)["kestus_min"].sum()                 # manöövri enda mõõdetud tööpäevad
+                            / c[c["tyyp"] == "tööpäev"].groupby(VOTI)["paev"].nunique()).fillna(0)
 save_table(man.reset_index().drop(columns="mp_id").round(2), "09_manoovrid")
 pikim, kaua = sei.loc[sei["kestus_min"].idxmax()], sei.loc[sei["koormus_min"].idxmax()]
 print(f"\nSeisakuid (>= {MIN_KESTUS} min; hõivatus >= täistaseme oma ja >= {SEISAK_H:.0%}, läbilase < {ALGUS:.0%}): {len(sei)}, "

@@ -22,6 +22,17 @@ ARVUTUS
              seos tuleb ainult maakondade erinevast käitumisest.
     Standardvead on klasterdatud maakonna järgi. Paarid: bensiin-kerged, diisel-kaubikud/veokid/bussid, kokku-kokku.
 
+CALCULATION IN PLAIN ENGLISH
+  County traffic index: the county's counters' average daily traffic added up / the same counters' 2023 averages added
+    up x 100 (one counter is enough). County sales index: county litres per day / its 2023 average x 100.
+  Correlations as in 02 (level, YoY, STL remainder) for petrol vs light vehicles and diesel vs vans, lorries and buses;
+    STL only when the traffic series is longer than 30 months.
+  Panel regression for all counties together: ln(sales) = e x ln(traffic) + fixed effects.
+    Model A: one constant per county + one per calendar month + a separate linear trend per county.
+    Model B: one constant per county + one per year-month, which removes everything that hits all counties at once
+             (prices, COVID); e then comes only from counties behaving differently.
+    e = % change in sales per 1% change in traffic; standard errors clustered by county.
+
 VÄLJUND (kaust valjund/)
   03_01_korrelatsioon_heatmap.png
       Näitab: kui tugev on seos igas maakonnas ja kas see püsib pärast hooajalisuse eemaldamist.

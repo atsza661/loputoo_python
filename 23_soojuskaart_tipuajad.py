@@ -13,10 +13,17 @@ ARVUTUS
   Värvipind = loenduskohtade väärtuste Gaussi kaaluga keskmine (Nadaraya-Watsoni silumine) igas võrgusõlmes x:
     z(x) = Σ w_i z_i / Σ w_i,   w_i = exp(-d_i² / (2 h²)),   d_i = kaugus loenduskohast i maapinnal
   h = silumislaius (H_KM: Harjumaa kaardil 3 km, Tallinna kaardil 1 km). Kaalutud keskmine jääb alati mõõdetud
-  väärtuste vahemikku (ei teki üle- ega alalöökeid nagu splainidel) ja üksiku loenduskoha ümber on värv selle koha
-  väärtus. Kaugemal kui 2 h lähimast loenduskohast hakkab pind hajuma ja 3 h kaugusel kaob (seal mõõtmisi pole,
+  väärtuste vahemikku (ei teki üle- ega alalöökeid nagu splainidel) ja teistest kaugel (üle 2 h) asuva loenduskoha
+  ümber on värv peaaegu selle koha väärtus; lähestikku kohad mõjutavad üksteist, ka koha enda kohal. Kaugemal kui 2 h lähimast loenduskohast hakkab pind hajuma ja 3 h kaugusel kaob (seal mõõtmisi pole,
   paistab ortofoto). Samaaja jooned iga 5, 10, 15 või 30 min järel nii, et jooni oleks kuni 8. Hommikukaardil on maanteel suund linna poole,
   õhtukaardil linnast välja (nagu 07 ja 21); ristmikud on mõlemal.
+
+CALCULATION IN PLAIN ENGLISH
+  Colour surface at a map point x = weighted average of the values at the counting places:
+    z(x) = sum(w_i x z_i) / sum(w_i), w_i = exp(-d_i^2 / (2 h^2)), d_i = distance to place i,
+    h = 3 km on the Harju map and 1 km on the Tallinn map. The result always stays between the measured values. Near a
+    place that has no neighbour within about 2 h the colour is close to its own value; nearby places pull each other.
+    The surface fades beyond 2 h from the nearest place and disappears at 3 h. Lines join points with the same time.
 
 VÄLJUND (kaust valjund/)
   23_01_soojus_harju_tipptund.png, 23_02_soojus_tallinn_tipptund.png

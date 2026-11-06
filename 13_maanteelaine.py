@@ -66,9 +66,10 @@ C) AEGLANE LIIKLUS JA SEISAK TALLINNA LÄHEDAL (loenduri suunad kuni AEGLUS_KM =
   hulka valitakse suunad, kus aeglus on tipuajal (algus 06-10 või 15-19).
   13_03_aeglus.png
       Näitab: millistel maanteelõikudel ja mis kell on liiklus tööpäeviti korduvalt aeglane või seisab.
-      Kuidas: ülal soojuskaart - rida = loenduri suund (suunad, kus aeglane lõik oli vähemalt 5 päeval; sildis loendur,
-      tee, kaugus Tallinnast, suund ja aeglaste päevade arv), veerg = veerandtund kell 5-21, värv = mitmel % tööpäevadest
-      on liiklus sel ajal aeglane (tumedam = sagedamini). All kuni neli näidet, tüüpiline tööpäev: sinine = vool,
+      Kuidas: ülal soojuskaart - rida = loenduri suund (suunad, kus aeglane lõik oli vähemalt 5 päeval; sama loenduri
+      suunad järjest, linna poole enne, loendurid aeglaste päevade osakaalu järgi; sildis loendur, tee, kaugus
+      Tallinnast, suund ja aeglaste päevade arv), veerg = veerandtund kell 5-21, värv = mitmel % tööpäevadest on liiklus
+      sel ajal aeglane (tumedam = sagedamini). All kuni neli näidet, tüüpiline tööpäev: sinine = vool,
       sõidukit tunnis (mediaan, vasak telg); oranž = kiirus (mediaan, parem telg), oranž katkendjoon = aeglaseim 10%
       päevi; punane vöönd = kellaaeg, mil liiklus on aeglane vähemalt 25% päevadest.
   13_aeglus.csv          loenduri suuna kokkuvõte: aeglaste ja seisakulähedaste päevade arv ja osakaal, tavaline algus,
@@ -90,6 +91,21 @@ D) EELHOIATUS
   13_eelhoiatus.csv, 13_eelhoiatus_paevad.csv
   ponytail: sissesuund tuleb andmetest (hommikune ülekaal), mitte teegeomeetriast, ja ristmik seotakse lähima
   piiriloenduriga linnulennult - koridoride täpseks sidumiseks on vaja käsitsi tabelit (ristmik -> maantee).
+
+CALCULATION IN PLAIN ENGLISH
+  Lanes of a direction are added; only quarter hours with all lanes. Profile = average of each quarter hour over typical
+    workdays (at least MIN_PAEVI days and 90% of quarter hours present).
+  A) Commuter wave = morning (06-10) share of the day - evening (15-19) share. Asymmetry = inbound wave - outbound wave.
+     Wave speed = inbound morning and outbound evening traffic midpoint (vehicle-weighted clock time) vs distance.
+  B) Weekend wave: Friday outbound volume 12-21 and Sunday inbound volume 12-24 / Monday-Thursday average at the same
+     clock time; traffic midpoint 12-24.
+  C) Slow traffic: mean speed = sum of (vehicles x band middle) / vehicles, when a quarter hour has at least 20
+     vehicles; usual speed = median 06-20; slow = mean speed <= 70% of usual; near standstill = at least half the
+     vehicles below 40 km/h; flow % = average flow of the slow stretch / the direction's usual busiest quarter hour
+     x 100. Days with volume below 0.4 or above 1.75 x usual are dropped.
+  D) Early warning: highway rise time = clock time when flow passes 80% of the direction's usual morning (05-09) top
+     quarter hour (straight line between quarters). Lead = junction congestion start (09) - rise time (medians over
+     workdays). With at least 3 shared days: Spearman rho of the daily deviations from the medians.
 """
 import sys
 
@@ -99,7 +115,7 @@ import matplotlib.pyplot as plt
 from scipy import stats
 
 from common import (maantee_suunad, load_junctions, km, add_basemap, to_merc, slot_label, set_style, save, save_table,
-                    OUT_DIR, loigud, C_BLUE, C_ORANGE, C_AQUA, C_RED, TEXT2)
+                    OUT_DIR, loigud, suunad_korvuti, C_BLUE, C_ORANGE, C_AQUA, C_RED, TEXT2)
 
 ALGUS = "2025-09-01"      # profiilide periood: viimane õppeaasta kuni andmete lõpuni
 MIN_PAEVI = 20            # profiil arvesse, kui loenduri suunal on vähemalt nii palju päevi
@@ -321,6 +337,8 @@ else:
     save_table(ak.assign(algus_mediaan=ak["algus_mediaan_h"].map(hhmm)).drop(columns="algus_mediaan_h").reset_index().round(1), "13_aeglus")
     silt = lambda s: f"{ak.at[s, 'nimi']} (T{ak.at[s, 'tee_nr']}, {ak.at[s, 'km_linnast']:.0f} km): {ak.at[s, 'lahte'].title()} → {ak.at[s, 'siht'].title()}"
     korduv = ak[ak["aeglaseid_paevi"] >= 5]
+    korduv = korduv.loc[suunad_korvuti(korduv.join(ds[["id", "tee_suund"]]).assign(v=-korduv["osa_paevadest_pct"]),
+                                       "id", "tee_suund", "v")]           # sama loenduri suunad järjest
     print(f"C) Aeglane liiklus ({A['site'].nunique()} loenduri suunda kuni {AEGLUS_KM} km Tallinnast, {A['paev'].nunique()} tööpäeva): "
           f"{len(al)} lõiku >= 30 min {al['site'].nunique()} suunal; vähemalt 5 päeval {len(korduv)} suunal")
     for s, r in korduv.head(6).iterrows():

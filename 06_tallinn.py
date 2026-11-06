@@ -24,7 +24,8 @@ ARVUTUS
     teoreetiline hajutamise potentsiaal = tipptunni mahu vähenemine, kui liiklus tipptunnist +-1 h (kokku 3 tundi)
     oleks täiesti ühtlane.
   Koolivaheajad: iga lühikese vaheaja (sügis, veebruar, kevad) tööpäevade profiil vs õppetöö-tööpäevad 14 päeva enne ja
-    14 päeva pärast; muutus % ööpäeva ja tipptundide mahus. Profiil, millest on puudu üle 1 h, jääb välja.
+    14 päeva pärast; muutus % ööpäeva ja tipptundide mahus. Profiil, millest on puudu üle 1 h, jääb välja; lühemad augud
+    täidetakse lineaarselt (mitte nulliga).
   Hajutamise mudel (common.shift_peak, spread_reduction): osa tipptunni sõidukitest (0...40%) sõidab Δ = 15, 30 või
     60 min varem, hiljem, pooleks täpselt +-Δ ("mõlemad") või jaotub ühtlaselt vahemikku +-Δ ("ühtlane", nt paindlik
     tööaja algus). Uus tipptund otsitakse 2 h võrra laiendatud aknast; tulemus = tipptunni mahu vähenemine, %.
@@ -34,21 +35,43 @@ ARVUTUS
     indeks (common.ratio_index, 2025 = 100); korrelatsioon Harjumaa müügiindeksiga logaritmitud tasemetes, kuumuutustes
     ja aastamuutustes. Suunaanalüüsis (SUUND) seda osa ei tehta, sest kütusemüügil suunda pole.
 
+CALCULATION IN PLAIN ENGLISH
+  Typical workday = Monday-Friday in school term, not a public holiday or shortened day. Junction profile = average
+    of each 15-minute slot over those days (a missing slot is skipped, not counted as 0). For 5-minute steps each
+    15-minute value is split by the 5-minute shares measured on the per-vehicle day.
+  Peak hour = the 60-minute window with the most vehicles, starting 06:00-09:59 (morning) or 14:00-18:59 (evening).
+    Volume = vehicles in that window. Share of day = volume / daily total x 100. PHF = volume / (4 x busiest 15
+    minutes inside it). Width = minutes (05-11 or 13-20) with at least 90% of the busiest slot of the peak hour.
+    Traffic midpoint = average clock time weighted by vehicles (06-10, 15-19).
+    Spreading potential = (1 - average hourly volume from 1 h before to 1 h after the peak hour / peak-hour volume) x
+    100: how much lower the peak would be if those 3 hours were perfectly even.
+  School holidays: profile of the holiday workdays vs school workdays 14 days before and after; change % = holiday
+    volume / reference volume x 100 - 100, for the day and the peak hours. Profiles missing more than 1 h are dropped;
+    shorter gaps are filled by straight lines between neighbouring slots.
+  Spreading model: share p (0-40%) of the peak-hour vehicles moves by D = 15, 30 or 60 min: earlier, later, half
+    exactly D earlier and half D later ("both"), or evenly over the slots within +-D ("even"). The new peak hour is
+    searched in a window 2 h wider. Result = (1 - new peak-hour volume / old peak-hour volume) x 100. Total traffic does
+    not change and junction capacity is not modelled.
+  Monthly index: junction's average daily total in months with at least 15 valid days; index = sum over junctions in
+    the month / the same junctions' 2025 averages summed x 100. Correlated with Harju county fuel sales in log levels,
+    month-on-month and year-on-year changes (not in the direction runs, sales have no direction).
+
 VÄLJUND (kaust valjund/, suunaanalüüsis valjund/LSS või valjund/LVS)
   06_01_profiilid.png
       Näitab: iga ristmiku tüüpilise tööpäeva kuju ja tipptundide asukohta.
-      Kuidas: väikesed joondiagrammid, paneel ristmiku kohta, lõpus Tallinna ümbruse maanteeloendurid (türkiis joon).
-      x-telg = kellaaeg 0-24, y-telg = sõidukeid pilu (5 või 15 min) kohta. Sinine vöönd = hommikune, oranž = õhtune
-      tipptund; nurgas kummagi tipptunni algus ja maht tunnis.
+      Kuidas: väikesed joondiagrammid, paneel ristmiku kohta, lõpus Tallinna ümbruse maanteeloendurid (türkiis joon;
+      sama koha linna sisse ja linnast välja järjest). x-telg = kellaaeg 0-24, y-telg = sõidukeid pilu (5 või 15 min)
+      kohta. Sinine vöönd = hommikune, oranž = õhtune tipptund; nurgas kummagi tipptunni algus ja maht tunnis.
   06_02_profiil_heatmap.png
       Näitab: kuidas liiklus päeva peale jaotub, kõik ristmikud kõrvuti.
       Kuidas: soojuskaart; rida = ristmik (järjestatud hommikuse tipptunni alguse järgi; maanteeloendurid musta joone
-      all), veerg = pilu. Värv = pilu osakaal ööpäeva liiklusest, % (tumedam = suurem; värviskaala otstes vähim ja
-      suurim väärtus). Sinine ja oranž kriips = hommikune ja õhtune tipptund.
+      all, sama koha sisse ja välja järjest, koht oma varasema hommikuse tipptunni järgi), veerg = pilu. Värv = pilu
+      osakaal ööpäeva liiklusest, % (tumedam = suurem; värviskaala otstes vähim ja suurim väärtus). Sinine ja oranž
+      kriips = hommikune ja õhtune tipptund.
   06_03_tipptunnid.png
       Näitab: mis kell on tipptund igal ristmikul.
-      Kuidas: rida = ristmik, x-telg = kellaaeg. Sinine riba = hommikune, oranž = õhtune tipptund (60 min), riba järel
-      maht (sõidukit tunnis). Taustavöönd = kõigi ristmike summa tipptund.
+      Kuidas: rida = ristmik (järjestus nagu 06_02), x-telg = kellaaeg. Sinine riba = hommikune, oranž = õhtune
+      tipptund (60 min), riba järel maht (sõidukit tunnis). Taustavöönd = kõigi ristmike summa tipptund.
   06_04_nadalapaevad.png
       Näitab: nädalapäevade erinevust (õppetöö ajal, ilma pühadeta).
       Kuidas: joondiagramm, kõik ristmikud kokku; x-telg = kellaaeg, y-telg = tuhat sõidukit pilu kohta. E-N sinise
@@ -93,7 +116,7 @@ from common import (load_tallinn, load_junctions, peak_metrics, peak_hour, shift
                     spread_reduction, ratio_index, load_fuel_county, corr_pair, slot_label, short_name,
                     set_style, save, save_table, month_axis, AM_WINDOW, PM_WINDOW,
                     TALLINN_BASE_YEAR, VAHEAEG_LABEL, load_vehicles, five_min_shares, to_5min, OUT_DIR, SUUND,
-                    RES, SUFFIX, otsamargid,
+                    RES, SUFFIX, otsamargid, suunad_korvuti,
                     C_BLUE, C_ORANGE, C_AQUA, C_YELLOW, C_GRAY, TEXT2, GRID)
 
 set_style()
@@ -155,7 +178,8 @@ for k, r in hw.iterrows():
 pm = pd.DataFrame(rows)
 save_table(pm, "06_tipptunnid")
 order = pm[pm.mp_id > 0].sort_values("hommik_algus_h")["mp_id"].tolist()
-hw_order = pm[pm.mp_id < 0].sort_values("hommik_algus_h")["mp_id"].tolist()
+hw_order = (suunad_korvuti(pm[pm.mp_id < 0].set_index("mp_id").join(hw[["id", "linn", "suund"]]), ["id", "linn"], "suund",
+                           "hommik_algus_h") if len(hw) else [])            # sama koha sisse ja välja järjest
 allp = pd.concat([prof, hprof])                 # ristmikud + maanteed, samad 5 min pilud
 
 # 1a) väikesed mitmikud: ristmikud, seejärel Tallinna kaardi maanteeloendurid
@@ -278,7 +302,7 @@ for _, b in breaks.iterrows():
         for mp, v in pr.iterrows():
             if v.isna().sum() > PH:                         # üle 1 h puudu
                 continue
-            met = peak_metrics(v.fillna(0).values, per_hour=PH)
+            met = peak_metrics(v.interpolate(limit_direction="both").values, per_hour=PH)   # kuni 1 h auke täidetakse
             cmp_rows.append(dict(vaheaeg_algus=b["min"].date(), tyyp=kind, mp_id=mp, **met))
 cmpd = pd.DataFrame(cmp_rows)
 piv = cmpd.pivot_table(index=["vaheaeg_algus", "mp_id"], columns="tyyp",

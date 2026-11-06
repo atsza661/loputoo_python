@@ -18,9 +18,19 @@ ARVUTUS
     punane, kollane ja stardikadu. Täistase raja kohta = manöövri kanalite täistasemete keskmine.
   Tundlikkus (27): sissesõiduteede eeldatav piir, kui maantee raja läbilaskevõime (27: RADA_NOM = 1800) asendada mõõdetud
     küllastusvoo alumise kvartiili, mediaani ja ülemise kvartiiliga. Muutub ainult maantee, mille kiirus tipul ei lange
-    (27: piiril = False); tee piir = väiksem maanteest ja linna serva ristmikust nagu 27-s.
+    (27: piiril = False), ja nagu 27-s ei lange see alla vaadeldud piiri C; tee piir = väiksem maanteest ja linna
+    serva ristmikust nagu 27-s.
   ponytail: küllastusvoog on mõõdetud foori stoppjoonel; mitme rajaga maanteel ilma foorita on raja läbilaskevõime
   tavaliselt suurem (1900-2200), seega on stoppjoone väärtus maanteele pigem ettevaatlik hinnang.
+
+CALCULATION IN PLAIN ENGLISH
+  Saturation flow s (from 10) = 3600 / median headway of the 5th and later queue positions, vehicles per hour per lane;
+    movements with at least MIN_VAATLUSI headways and MIN_TSUKLEID full cycles.
+  Effective green share g/C = full level per lane / s: a lane that is full at the peak passes s x g/C vehicles per
+    hour. Full level per lane = average full level of the movement's lanes (24).
+  Sensitivity (27): the entry-road limits again with the highway lane capacity RADA_NOM replaced by the lower
+    quartile, median and upper quartile of measured s. Only highways whose speed does not drop at top flow change, and
+    as in 27 never below their observed limit C; road limit = smaller of highway and edge junction.
 
 VÄLJUND (kaust valjund/)
   33_01_kullastusvoog_eeldus.png
@@ -55,13 +65,15 @@ def liik(turns):
     return "otse" if vp + pp == 0 else ("vasakpööre" if vp >= pp else "parempööre")
 
 
-def maantee_piir(eeldatav, radu, piiril, rada):
-    """Maantee eeldatav piir uue raja väärtusega: ainult siis, kui kiirus tipul ei lange (27)."""
-    return eeldatav if piiril or np.isnan(eeldatav) else radu * rada
+def maantee_piir(eeldatav, C, radu, piiril, rada):
+    """Maantee eeldatav piir uue raja väärtusega: ainult siis, kui kiirus tipul ei lange (27), ja nagu 27-s mitte alla
+    vaadeldud piiri C (tee on juba nii palju läbi lasknud)."""
+    return eeldatav if piiril or np.isnan(eeldatav) else max(C, radu * rada)
 
 
 assert liik([np.nan, "left (vasakpööre)"]) == "vasakpööre" and liik([np.nan, np.nan]) == "otse"
-assert maantee_piir(5400, 3, False, 2000) == 6000 and maantee_piir(2200, 2, True, 2000) == 2200
+assert maantee_piir(5400, 5000, 3, False, 2000) == 6000 and maantee_piir(2200, 2200, 2, True, 2000) == 2200 and \
+       maantee_piir(4500, 4500, 2, False, 2000) == 4500                  # vaadeldud voog on alampiir
 
 set_style()
 k = pd.read_csv(OUT_DIR / "10_kullastusvoog.csv")
@@ -91,7 +103,7 @@ for nimi, rada in [("27 eeldus", RADA_NOM), ("mõõdetud alumine kvartiil", q25)
     piir = []
     for _, r in ss.iterrows():
         m = mp_.loc[r["m_nimi"]] if r["m_nimi"] in mp_.index else None
-        mt = np.nan if m is None else maantee_piir(r["maantee_eeldatav"], m["radu"], bool(m["piiril"]), rada)
+        mt = np.nan if m is None else maantee_piir(r["maantee_eeldatav"], m["C"], m["radu"], bool(m["piiril"]), rada)
         piir.append(np.nanmin([mt, r["ristmik_eeldatav"]]))
     kokku = np.nansum(piir)
     rows.append(dict(rada=nimi, rada_soid_h=round(rada), sissesoidu_piir=round(kokku),

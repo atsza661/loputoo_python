@@ -8,7 +8,8 @@ SISEND
 
 ARVUTUS
   Päevad: tavalised tööpäevad (E-R, õppetöö, mitte püha ega lühendatud päev), kogu andmeperiood.
-  Iga ristmiku ja päeva kohta kolm mahtu: ööpäev, hommik 07:00-09:00 ja õhtu 16:00-18:00 (15 min väärtuste summa).
+  Iga ristmiku ja päeva kohta kolm mahtu: ööpäev, hommik 07:00-09:00 ja õhtu 16:00-18:00 (15 min väärtuste summa;
+    päev arvesse, kui pilusid on vähemalt 88, lühemad augud täidetakse lineaarselt, nagu 30 ja 37).
   Kõrvalekalle = log(maht) - sama ristmiku log(maht) liikuv mediaan (TASE tööpäeva, keskel) - ristmiku nädalapäeva
     keskmine sellest: tavaline tase, nädalapäev ja aeglased muutused (hooaeg, ehitus) välja. Lühike aken on oluline:
     loenduri vahetuse vms astmeline tasemenihe annab kõrvalekalde ainult mõnele päevale nihke ümber (pika aknaga
@@ -17,6 +18,14 @@ ARVUTUS
   Seos = Pearsoni korrelatsioon kahe ristmiku jääkide vahel ühistel päevadel (vähemalt MIN_PAEVI).
   Kaugus = linnulennult (common.km). Kaugusvööndi seos = vööndi paaride korrelatsiooni mediaan.
   Kaardil seosed r >= R_KAART (ööpäev).
+
+CALCULATION IN PLAIN ENGLISH
+  Typical workdays, whole period. Per junction and day three volumes: day, 07-09 and 16-18 (sum of 15-minute values; a
+    day needs at least 88 slots, shorter gaps are filled by straight lines).
+  Deviation = ln(volume) - ln of the junction's rolling median (TASE workdays) - the junction's weekday average of that;
+    then minus the median deviation of all junctions on the same day (removes city-wide effects).
+  Link = Pearson correlation of two junctions' deviations over shared days (at least MIN_PAEVI). Distance = straight
+    line. Distance band value = median correlation of its pairs.
 
 VÄLJUND (kaust valjund/)
   38_01_korrelatsioonivork.png
@@ -35,7 +44,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 
-from common import (load_tallinn, load_junctions, add_basemap, to_merc, map_extent, km, set_style, save, save_table, HALO,
+from common import (paeva_maatriks, load_tallinn, load_junctions, add_basemap, to_merc, map_extent, km, set_style, save, save_table, HALO,
                     ramp, C_BLUE, C_ORANGE, C_GRAY, TEXT, TEXT2)
 
 AKNAD = {"ooopaev": (0, 96), "hommik": (28, 36), "ohtu": (64, 72)}     # 15 min pilud
@@ -65,9 +74,10 @@ t, d = load_tallinn()
 d = d[d["kehtiv"] & (d["paevatyyp"] == "tööpäev") & (d["vaheaeg"] == "kool")]
 t = t.merge(d[["mp_id", "paev"]], on=["mp_id", "paev"])
 jaagid = {}
+w = paeva_maatriks(t)
+w = w[w.notna().sum(axis=1) >= 88].T.interpolate(limit_direction="both").T    # lühemad augud täidetakse (nagu 30, 37)
 for nimi, (a, b) in AKNAD.items():
-    z = t[t["slot"].between(a, b - 1)].groupby(["mp_id", "paev"])["v"].agg(["sum", "count"])
-    z = z.loc[z["count"] >= 0.9 * (b - a), "sum"].unstack("mp_id")
+    z = w.loc[:, a:b - 1].sum(axis=1).unstack("mp_id")
     k = z.apply(korvalekalle)
     jaagid[nimi] = k.sub(k.median(axis=1), axis=0)
 mps = jaagid["ooopaev"].columns

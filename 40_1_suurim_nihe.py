@@ -20,6 +20,14 @@ ARVUTUS
     nii suur (tsenseeritud, märgitud ">="). Parim nihe = Δ, mille juures päeva võit on suurim (kaugemal hakkavad
     nihkunud autod juba tihedamat aega koormama); kui see on viimane arvutatud Δ, on parim nihe veel kaugemal.
 
+CALCULATION IN PLAIN ENGLISH
+  Share p per peak from 40_0 (enough for a 60-minute shift to be noticeable in both models). Shift D in 15-minute steps
+    up to 360 min (morning) or 240 min (evening): p of each day's peak-hour cars move, half D earlier, half D later.
+  Peak gain as in 40_0 (A: speed %, B: percentage points), median over days. Day gain = (1 - whole-day total after /
+    before) x 100, total = delay x vehicles (A) or summed congestion share (B); negative = the day got worse.
+  Helps = noticeable peak gain and day gain > 0. Largest shift = last D of the first unbroken run of "helps" (">=" when
+    the run reaches the end of the grid). Best shift = D with the largest day gain.
+
 VÄLJUND (kaust valjund/)
   40_1_01_suurim_nihe.png
       Näitab: kas linna võit kaob, kui nihe läheb väga pikaks, ja kus on nihke parim pikkus kogu päeva jaoks.

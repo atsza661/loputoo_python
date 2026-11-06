@@ -16,6 +16,15 @@ ARVUTUS
      sõiduki juures tühi minut (lühike rike).
   Kontrolliks trükitakse, kui palju erineb 5 min jaotus tipptundidel ühtlasest (33,3%).
 
+CALCULATION IN PLAIN ENGLISH
+  a) Shares: vehicles per day on each detector (lane). Lane share of its direction or junction = lane vehicles /
+     direction (or junction) vehicles x 100; the same for a direction within its junction and a junction among all.
+  b) 5-minute shares: each 15-minute slot of each junction is split into three parts, part share = vehicles in those 5
+     minutes / vehicles in the 15 minutes x 100 (the three add up to 100%). When the slot has fewer than 30 vehicles, a
+     part is empty or an empty minute appears at 150+ vehicles (short fault), the combined split of all junctions is
+     used instead.
+  Check: how far the peak-hour 5-minute split is from an even 33.3% each.
+
 VÄLJUND (kaust valjund/)
   08_osakaalud.csv        read kolmel tasemel (ristmik, suund, loendur): sõidukeid ööpäevas ja osakaalud
   08_5min_osakaalud.csv   ristmik x 15 min pilu: osa_0, osa_1, osa_2 (%), sõidukeid pilus, kas kasutati koondjaotust

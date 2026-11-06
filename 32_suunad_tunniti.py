@@ -14,11 +14,21 @@ ARVUTUS
     SILUMINE), et öine juhuslikkus ei mürataks.
   Maanteeloendurid (MAANTEED: sama loendurid nagu 27): tavalised tööpäevad (E-R, õppetöö, mitte püha) alates
     ALGUS_MAANTEE, mõlema suuna sõidukid summeeritakse üle päevade ja siis jagatakse.
-  Ristmikud: logija nädala tööpäevad (NADAL), LSS- ja LVS-kanalite sõidukid summeeritakse üle päevade. Ristmik on sees,
+  Ristmikud: logija nädala tööpäevad (NADAL; ainult ristmiku terved päevad, kõik pordid kaetud 05-23), LSS- ja
+    LVS-kanalite sõidukid summeeritakse üle päevade. Ristmik on sees,
     kui LSS/LVS märgisega on vähemalt MIN_MARGIS tema liiklusest ja kumbagi suunda on vähemalt 5% (muidu pole
     tasakaalu, nt ühe suuna loendur). Pilud, kus kokku on alla MIN_N sõiduki, jäävad tühjaks.
   Linn kokku (ristmikud) = kõigi sobivate ristmike LSS / (LSS + LVS) summadest.
   Tõusu ja mõõna tugevus ristmikul = hommikune osakaal (07:00-09:00) - õhtune osakaal (16:00-18:00), %-punktides.
+
+CALCULATION IN PLAIN ENGLISH
+  Inbound share = inbound / (inbound + outbound) x 100 in each 15-minute slot, both counts first summed over a rolling
+    60-minute window (30 min before to 30 min after the slot start) and over the days. 50% = equal both ways.
+  Highways: typical workdays from ALGUS_MAANTEE. Junctions: logger-week workdays, complete junction-days only, inbound
+    (LSS) and outbound (LVS) lanes; a junction is used when at least MIN_MARGIS of its traffic has a direction label and
+    each direction has at least 5%. Slots with fewer than MIN_N vehicles stay empty.
+  City (junctions) = sum of inbound / sum of both over all suitable junctions.
+  Tide strength = morning share (07-09) - evening share (16-18), percentage points.
 
 VÄLJUND (kaust valjund/)
   32_01_suunad_tunniti.png
@@ -36,7 +46,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-from common import (maantee_suunad, load_vehicles, load_junctions, day_calendar, set_style, save, save_table,
+from common import (tervetel_paevadel, maantee_suunad, load_vehicles, load_junctions, day_calendar, set_style, save, save_table,
                     short_name, slot_label, DIVERGING, TEXT, TEXT2, C_BLUE, C_ORANGE, C_AQUA, C_YELLOW, C_MAGENTA,
                     C_GREEN, C_VIOLET)
 
@@ -99,7 +109,7 @@ mt = pd.concat(m_rows, ignore_index=True)
 
 # --- ristmikud (logija nädal) -------------------------------------------------------------------------------------------
 v = load_vehicles(None, koik=True)
-v = v[v["ts"].dt.normalize().isin(NADAL)]
+v = tervetel_paevadel(v[v["ts"].dt.normalize().isin(NADAL)]).copy()      # ristmiku terved päevad
 v["slot"] = v["ts"].dt.hour * 4 + v["ts"].dt.minute // 15
 margis = (v["LSS"] | v["LVS"]).groupby(v["mp_id"]).mean()
 g = v.groupby(["mp_id", "slot"])[["LSS", "LVS"]].sum()
@@ -108,7 +118,9 @@ sobib = margis[(margis >= MIN_MARGIS)].index.intersection(tot[(tot.min(axis=1) /
 g = pd.concat({m: g.loc[m].apply(silu) for m in sobib}, names=["mp_id", "slot"])
 rt = pd.DataFrame({"tyyp": "ristmik", "nimi": [jn.loc[m, "code"] for m in g.index.get_level_values(0)],
                    "slot": g.index.get_level_values(1), "osakaal": osakaal(g["LSS"], g["LVS"]).values,
-                   "soidukeid": (g["LSS"] + g["LVS"]).values, "paevi": len(NADAL)})
+                   "soidukeid": (g["LSS"] + g["LVS"]).values,
+                   "paevi": v.groupby("mp_id")["ts"].agg(lambda s: s.dt.normalize().nunique())
+                             .reindex(g.index.get_level_values(0)).values})
 linn = g.groupby("slot").sum()
 linn = osakaal(linn["LSS"], linn["LVS"])
 save_table(pd.concat([mt, rt], ignore_index=True), "32_suunad_tunniti")

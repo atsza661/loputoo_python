@@ -14,10 +14,23 @@ ARVUTUS
     mahuga kaalutud keskmine kellaaeg (hommik 06-10, õhtu 15-19); teravus = 1 - (tipptund +-1 h keskmine tunnimaht) /
     tipptunni maht, % (peak_metrics max_potentsiaal_%: nii palju väheneks tipptund, kui liiklus jaotuks 3 tunnile
     ühtlaselt; tipu laius minutites oleks 15 min andmetel astmeline).
-  Linna päeva väärtus = ristmike mediaan; kuu väärtus = päevade mediaan (kuud, kus on vähemalt MIN_PAEVI tööpäeva).
+  Linna päeva väärtus = ristmike mediaan, ainult päevad, kus on andmed vähemalt PAEV_OSA kindla valimi ristmikest
+    (päevade koosseis on võrreldav); kuu väärtus = päevade mediaan (kuud, kus on vähemalt MIN_PAEVI tööpäeva).
   Õppeaasta = august kuni juuli (2024/25, 2025/26, 2026/27).
-  Aastamuutus: sama kuu kahel järjestikusel õppeaastal; iga ristmiku kuumediaanide paariserinevus, ristmike mediaan ja
+  Aastamuutus: sama kuu kahel järjestikusel õppeaastal; iga ristmiku kuumediaanide paariserinevus (ristmiku kuu
+    arvesse, kui sel on vähemalt MIN_PAEVI_RISTMIK tööpäeva), ristmike mediaan ja
     Wilcoxoni märgiga astakute test (scipy) - kas muutus on ristmikel ühesuunaline.
+
+CALCULATION IN PLAIN ENGLISH
+  Workdays (Mon-Fri, no holidays, school holidays included). Fixed junction panel: junctions with a valid day on at
+    least PANEEL_OSA of all workdays.
+  Per junction and day (peak metrics on the 15-minute profile): K = peak-hour volume / daily volume x 100; traffic
+    midpoint = vehicle-weighted clock time; sharpness = (1 - average hourly volume from 1 h before to 1 h after the peak
+    hour / peak-hour volume) x 100.
+  City day value = median over the panel junctions, only days with at least PAEV_OSA of the panel; month value = median
+    over its days (months with at least MIN_PAEVI workdays). School year = August-July.
+  Year-on-year: the same month in two consecutive school years; per junction the difference of its monthly medians
+    (junction-months with at least MIN_PAEVI_RISTMIK days), the median over junctions and a Wilcoxon signed-rank test.
 
 VÄLJUND (kaust valjund/)
   35_01_tipu_hajumine.png
@@ -34,10 +47,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import wilcoxon
 
-from common import load_tallinn, peak_metrics, set_style, save, save_table, hhmm, GRID, TEXT2
+from common import paeva_maatriks, load_tallinn, peak_metrics, set_style, save, save_table, hhmm, GRID, TEXT2
 
 PANEEL_OSA = 0.85
 MIN_PAEVI = 10
+PAEV_OSA = 0.9                       # linna päev arvesse, kui sel on andmed vähemalt 90% kindla valimi ristmikest
+MIN_PAEVI_RISTMIK = 5                # ristmiku kuu aastavõrdluses, kui ristmikul on kuus vähemalt 5 tööpäeva
 KUUD = ["aug", "sept", "okt", "nov", "dets", "jaan", "veebr", "märts", "apr", "mai", "juuni", "juuli"]
 NAITAJAD = [("osakaal_%", "K: tipptund, % ööpäevast"), ("keskaeg_h", "liikluse keskaeg"),
             ("max_potentsiaal_%", "teravus: tipptund vs +-1 h, %")]
@@ -60,19 +75,21 @@ paneel = d.groupby("mp_id").size()
 paneel = paneel[paneel >= PANEEL_OSA * tp].index
 d = d[d["mp_id"].isin(paneel)]
 t = t.merge(d[["mp_id", "paev"]], on=["mp_id", "paev"])
-w = t.pivot_table(index=["mp_id", "paev"], columns="slot", values="v", aggfunc="sum")
+w = paeva_maatriks(t)            # puuduv pilu jääb NaN-iks (mitte 0)
 w = w[w.notna().sum(axis=1) >= 88].T.interpolate(limit_direction="both").T
 veerud = [f"{tipp}_{n}" for tipp in ["hommik", "ohtu"] for n, _ in NAITAJAD]
 pm = pd.DataFrame([peak_metrics(x) for x in w.values], index=w.index)[veerud].astype(float).reset_index()
 pm[["oppeaasta", "kuu_nr"]] = pd.DataFrame([oppeaasta(p) for p in pm["paev"]], index=pm.index)
 
-paev = pm.groupby(["paev", "oppeaasta", "kuu_nr"])[veerud].median().reset_index()
+paev = pm.groupby(["paev", "oppeaasta", "kuu_nr"]).agg(ristmikke=("mp_id", "size"), **{c: (c, "median") for c in veerud})
+paev = paev[paev["ristmikke"] >= PAEV_OSA * len(paneel)].drop(columns="ristmikke").reset_index()   # sama valim igal päeval
 kuu = paev.groupby(["oppeaasta", "kuu_nr"]).agg(tooaevi=("paev", "size"), **{c: (c, "median") for c in veerud}).reset_index()
 kuu = kuu[kuu["tooaevi"] >= MIN_PAEVI]
 save_table(kuu.assign(kuu=kuu["kuu_nr"].map(dict(enumerate(KUUD)))), "35_kuud")
 
 # --- aastamuutus: ristmike paariserinevused -------------------------------------------------------------------------------
-rk = pm.groupby(["mp_id", "oppeaasta", "kuu_nr"])[veerud].median()
+rk = pm.groupby(["mp_id", "oppeaasta", "kuu_nr"]).agg(paevi=("paev", "size"), **{c: (c, "median") for c in veerud})
+rk = rk[rk["paevi"] >= MIN_PAEVI_RISTMIK][veerud]
 aastad = sorted(kuu["oppeaasta"].unique())
 rows = []
 for a0, a1 in zip(aastad[:-1], aastad[1:]):

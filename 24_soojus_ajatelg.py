@@ -33,6 +33,19 @@ ARVUTUS
   ponytail: loendurid on stoppjoonel, seega q ja H on punktimõõdud; viivitust ja järjekorra pikkust (HCM/HBS
   teenindustase) need ei anna. 5 min pilus on 3-5 fooritsüklit, seega üksik pilu on mürane.
 
+CALCULATION IN PLAIN ENGLISH
+  For each detector (lane) and day, in 5-minute slots:
+    throughput q = vehicles in the slot x 12 (per hour);
+    occupancy H = sum of the time vehicles spent on the detector in the slot / 300 s;
+    full level = the day's largest 15-minute rolling average of q, median over days (lanes below MIN_TAIS skipped);
+    H at full level = median H in slots where q >= 80% of full level.
+  State: free q < 50% of full level; dense 50-80%; full >= 80%; stoppage = q < 80% AND H >= max(H at full level, 10%).
+  Lane load = min(q / full level, 1), and 1 in stoppage. Junction load = average of its lanes' loads weighted by their
+    full levels x 100 (0-100%). Stoppage share = full levels of lanes in stoppage / junction's total full level.
+  Fault: a lane with no vehicles for at least RIKE_MIN minutes while its usual throughput there is at least 20% of full
+    level counts as missing, not 0; a junction is missing when more than half of its full level is missing.
+  Map surface = Gaussian-weighted average of junction loads, as in 23.
+
 VÄLJUND (kaust valjund/24_soojus_ajatelg/)
   24_01_<kuupäev>_<HHMM>.png   (8 päeva x 156 kaarti, kell 06.00-18.55)
       Näitab: kui koormatud on Tallinna ristmikud ühel 5 minutil: kus liiklus on läbilaskevõimel ja kus seisab.

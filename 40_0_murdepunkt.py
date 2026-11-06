@@ -15,6 +15,9 @@ ARVUTUS
     üleküllastuse osa (raja läbilaskevõime c = küllastusvoog x g/C, 33). Kiirus = LOIK_M (500 m) lõigu kiirus, kui
     vaba kiirusega (50 km/h) sõidule lisandub viivitus. Halvim tund = sõidukitega kaalutud tunnikeskmise suurim
     viivitus (tunni algus hommikul 06:00-09:45, õhtul 14:00-18:45).
+    Piirangud: iga 15 min pilu arvutatakse eraldi ilma eelmise pilu järjekorrata (algjärjekord 0) ja kogu ristmik ühe
+    esindusliku rajarühmana (ristmiku voog / ristmiku piir, mediaanne tsükkel ja g/C), mitte rajarühmade kaupa. See on
+    võrdlev mudel: järjekorra kandumist järgmisse pilusse ja ühe üleküllastunud haru viivitust see ei näita.
   Mudel B (ummikuosa): logija nädala (16., 19.-23.10.2026) 15 min piludest seos voog -> täis või seisakus kanalite osa
     ristmiku täistasemest (24; täis = kanal laseb läbi >= 80% oma tavalisest päeva suurimast voost, seisak = loendur
     kaetud, aga läbi pääseb vähe), kasvav monotoonne regressioon (common.pav). Voog on tavalise tipptunni ühikutes
@@ -38,6 +41,25 @@ ARVUTUS
     kiirusega tund. Kõikumine nii mõõdetud kiirusest kui ka voost (seose järgi); yt murdepunkt mõlema järgi. Välja
     jäävad 15 min, kus voog on üle 600 sõiduki raja kohta (loenduri viga), ja päevad, kus 06-20 on mõni pilu puudu
     (Viljandi mnt Kangru loenduril pole alates 09.2025 ühtegi täielikku tööpäeva).
+
+CALCULATION IN PLAIN ENGLISH
+  Model A (delay). Degree of saturation X = 4 x 15-minute flow / C (expected limit, 27). Delay per vehicle (HCM 2010):
+    d1 = 0.5 x cycle x (1 - g/C)^2 / (1 - min(X, 1) x g/C)  (waiting at red)
+    d2 = 900 x T x [(X - 1) + sqrt((X - 1)^2 + 8 x k x X / (c x T))], c = saturation flow x g/C, T = 0.25 h, k = 0.5.
+    Speed on a 500 m stretch = 3.6 x 500 / (500 / (50 / 3.6) + delay). Worst hour = hour (start 06:00-09:45 or
+    14:00-18:45) with the largest vehicle-weighted average delay. Every slot is computed on its own (no queue carried
+    to the next) and the junction as one representative lane group, so this is a comparison model.
+  Model B (congestion share). From the logger-week 15-minute slots: an increasing monotone fit of the congestion share
+    (full or stopped lanes' share of the junction's full level, 24) against flow measured in units of the usual peak
+    hour; applied to historical days. Worst hour = hour with the largest average congestion share.
+  Scenarios, share p = 1-30%: yt = p of all cars disappear for the whole day (public transport); nihe30 / nihe60 = p of
+    each day's peak-hour cars move, half 30 (60) min earlier and half later.
+  Gain: A = (worst-hour speed after / before - 1) x 100; B = worst-hour congestion share before - after (percentage
+    points). Junction = median over days. City = panel junctions together (A weighted by vehicles, B by full level).
+  Noticeable = gain >= day-to-day noise and >= STS_MIN_VOIT. Noise A = 90th percentile / median - 1 of the worst-hour
+    speed relative to its 21-day moving median; noise B = median - 10th percentile. Break point = smallest p with a
+    noticeable gain.
+  Highway check: measured speeds; decreasing monotone fit of speed against flow; worst hour = slowest hour.
 
 VÄLJUND (kaust valjund/)
   40_0_01_murdepunkt.png
@@ -90,7 +112,7 @@ tagurpidi = lambda site: site.split(" | ")[0] + " | " + " - ".join(site.split(" 
 
 # HCM valem käsitsi: X = 1, C = 90 s, g/C = 0,28, c = 509 -> d1 = 32,4 s, d2 = 39,9 s
 assert abs(hcm_viivitus(1.0, 90, 0.28, 509) - 72.29) < 0.01
-assert np.allclose(pav([1, 2, 3, 4], [1, 3, 2, 4])[1], [1, 2.5, 4])
+assert np.allclose(pav([1, 2, 3, 4], [1, 3, 2, 4])[1], [1, 2.5, 2.5, 4])
 
 set_style()
 jn = load_junctions().set_index("mp_id")

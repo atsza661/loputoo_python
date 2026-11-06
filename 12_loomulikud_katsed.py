@@ -16,8 +16,9 @@ A) KOOLIPÄEVA ALGUS
   aktusepäevad välja; nädalapäevad võrdse kaaluga) aastatel 2024, 2025 ja 2026. Paar "2026 vs 2025" on koolialguse
   muutus, "2025 vs 2024" näitab võrdluseks eelmise aasta muutust.
     toores vahe = 15 min pilu liikluse muutus, %
-    puhas vahe  = toores vahe - sama ristmiku ööpäeva liikluse muutus samas aknas (protsendipunkti) ehk kuidas muutus
-                  liikluse jaotus päeva sees, kui üldine aastane kasv või langus on maha arvatud
+    puhas vahe  = pilu osakaalu ööpäevast suhteline muutus, %: (1 + toores vahe) / (1 + sama ristmiku ööpäeva liikluse
+                  muutus samas aknas) - 1 ehk kuidas muutus liikluse jaotus päeva sees, kui üldine aastane kasv või
+                  langus on maha arvatud (täpne suhe, mitte kahe protsendi vahe)
   Ristmik, mille ööpäeva liiklus muutus üle 15% (teetööd, ümbersõidud), jääb selle paari mediaanidest välja. Tulemus =
   mediaan üle ristmike ja mediaani 95% usaldusvahemik (bootstrap); ristmiku näitajatel (tipu algus, keskaeg, tipptunni
   maht, osakaal ööpäevast 06:00-07:30, 07:30-08:30 ja 08:30-09:30, aeg täistasemel) lisaks Wilcoxoni p.
@@ -45,8 +46,8 @@ B) VÄIKE LANGUS, SUUR VÕIT
      alates 50 päevast)
   2) lühikesed koolivaheajad vs 2 nädalat enne ja pärast: liiklus -x% -> aeg täistasemel -y%
   3) 06 hajutamisstsenaariumide tipptunni vähenemine samal kõveral (tipptunni indeks)
-  4) kalibreerimine sõidukipõhiste päevadega: aeg täistasemel vs täis tsüklites liikunud sõidukite aeg (09), Spearmani
-     rho
+  4) kalibreerimine sõidukipõhiste päevadega (ristmiku terved päevad): aeg täistasemel vs aeg täis tsüklites (09: täis
+     tsüklite kestuse osa veerandtunni tsüklite kestusest x 15 min), Spearmani rho
   Põhitulemus on ristmike ja tippude kohta, kus 09 leidis stabiilse ummiku vähemalt pooltel tööpäevadel ("ummikuga");
   teised ei pruugi täistasemel üldse küllastuda.
   12_03_vaike_muutus.png
@@ -61,6 +62,23 @@ B) VÄIKE LANGUS, SUUR VÕIT
   ponytail: "aeg täistasemel" tuleb ristmiku summaarsest loendusest, mitte järjekorrast - see on ummiku asendusnäitaja
   (kalibreerimine näitab, kui hea) ja seos on vaatluslik, mitte järjekorramudel. Täpsem oleks manöövripõhine tsüklite
   analüüs (09) mitme nädala kohta.
+
+CALCULATION IN PLAIN ENGLISH
+  A) School start moved to 9:00 in 2026. Same September window (3-20 Sept, workdays, weekdays equally weighted) in 2024,
+     2025 and 2026. Raw change per 15-minute slot = (this year / last year - 1) x 100. Pure change = ((1 + raw / 100) /
+     (1 + daily change / 100) - 1) x 100 = relative change of the slot's share of the day, so overall growth is removed.
+     Junctions whose daily traffic changed more than 15% are left out. Result = median over junctions with a 95%
+     bootstrap interval; Wilcoxon p for the junction metrics.
+  B) Small drop, big gain. Full level = local usual value of the day's largest 15-minute count (31-day rolling median of
+     school days). Minutes at full level = 15 x number of 15-minute counts >= 90% of it. Traffic index = the window's
+     traffic / its local usual value x 100.
+     1) Curve: average minutes at full level per 2.5% band of the index (bands with at least 50 days).
+     2) Short school holidays vs 2 weeks before and after: traffic -x% gives minutes at full level -y%.
+     3) The 06 spreading scenarios placed on the same curve.
+     4) Calibration on complete per-vehicle junction-days: minutes at full level vs minutes in full cycles from 09
+        (share of the quarter hour's cycle time that was in full cycles x 15), Spearman rho.
+     Both axes come from the same counts, so part of the curve is mechanical (fewer vehicles means fewer counts above a
+     fixed level); the calibration shows how well it tracks real congestion.
 """
 import numpy as np
 import pandas as pd
@@ -68,7 +86,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 
-from common import (load_tallinn, load_junctions, load_vehicles, peak_metrics, mediaani_uv, short_name, slot_label,
+from common import (tervetel_paevadel, load_tallinn, load_junctions, load_vehicles, peak_metrics, mediaani_uv, short_name, slot_label,
                     set_style, save, save_table, OUT_DIR, DIVERGING, C_BLUE, C_ORANGE, C_AQUA, C_GRAY, TEXT2)
 
 AKEN = (3, 20)                              # septembri päevad (1.-2.09 aktus; 2026. a andmed lõpevad 20.09)
@@ -122,7 +140,7 @@ for a, b in PAARID:
     kasv = (A.sum(axis=1) / B.sum(axis=1) - 1) * 100
     ok = kasv.index[kasv.abs() <= KASV_MAX]
     toores = (A.loc[ok] / B.loc[ok] - 1) * 100
-    puhas = toores.sub(kasv[ok], axis=0)
+    puhas = ((1 + toores / 100).div(1 + kasv[ok] / 100, axis=0) - 1) * 100     # pilu osakaalu suhteline muutus
     toores_paar[paar], puhas_paar[paar] = toores, puhas
     valjas = ", ".join(f"{j.at[m, 'code']} {kasv[m]:+.0f}%" for m in kasv.index.difference(ok)) or "-"
     print(f"   {paar}: {len(ok)} ristmikku, ööpäeva liiklus {kasv[ok].median():+.1f}% (mediaan); välja jäid (muutus üle "
@@ -303,14 +321,14 @@ kalib = None
 veh = load_vehicles(None, koik=True)
 if veh is not None and (OUT_DIR / "09_tsuklid.csv").exists():
     veh = veh.assign(paev=veh["ts"].dt.normalize(), slot=veh["ts"].dt.hour * 4 + veh["ts"].dt.minute // 15)
-    tunde = veh.groupby("paev")["ts"].agg(lambda s: s.dt.hour.nunique())
-    veh = veh[veh["paev"].isin(tunde[tunde >= 23].index) & (veh["paev"].dt.dayofweek < 5)]      # terved tööpäevad
+    veh = tervetel_paevadel(veh)                                     # ristmiku terved päevad (kõik pordid kaetud)
+    veh = veh[veh["paev"].dt.dayofweek < 5]                         # tööpäevad
     n15 = veh.groupby(["mp_id", "paev", "slot"]).size().unstack("slot", fill_value=0).reindex(columns=range(96), fill_value=0)
     c = loe("09_tsuklid", parse_dates=["algus"])
     c = c.assign(mp_id=c["mp"].str[2:].astype(int), paev=c["algus"].dt.normalize(), slot=(c["t"] // 900).astype(int),
-                 tn=c["n"] * c["ummikus"])
-    k = c.groupby(["mp_id", "paev", "slot"])[["tn", "n"]].sum()
-    k = (k["tn"] / k["n"].where(k["n"] > 0)).unstack("slot").reindex(columns=range(96)).fillna(0) * 15     # min veerandis
+                 tT=c["T"] * c["ummikus"])
+    k = c.groupby(["mp_id", "paev", "slot"])[["tT", "T"]].sum()                # täis tsüklite aeg / tsüklite aeg
+    k = (k["tT"] / k["T"].where(k["T"] > 0)).unstack("slot").reindex(columns=range(96)).fillna(0) * 15     # min veerandis
     viim = d.sort_values("paev").groupby(["mp_id", "tipp"])["tase"].last()          # viimane teadaolev täistase
     rows = []
     for tipp, (a, b) in TIPUD.items():

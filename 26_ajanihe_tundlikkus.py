@@ -23,6 +23,18 @@ ARVUTUS
   Kõik sõidud mudelis ei saa tipp kasvada, kui tipptund on päeva suurim tund: max[(1-p) H(t) + p H(t-Δ)] <= H_max,
     vähenemine on kuni p (1 - H(t_tipp - Δ) / H_max); akna serval olev tipp võib kasvada (suurem tund tuleb aknasse). Mudel ei arvesta läbilaskevõimet ega seda, et nihkuv sõitja liigub koos teistega.
 
+CALCULATION IN PLAIN ENGLISH
+  Junction profile = average of each slot over valid workdays: 96 quarter hours from the 15-minute counts (a day missing
+    more than 2 h is dropped, shorter gaps are filled by straight lines), 1440 minutes from the per-vehicle records (a
+    junction-day is dropped when a lane is silent for over 1 h at 06-22 where it usually has traffic, or when the
+    detector numbers show more than 3% of vehicles missing). All junctions = sum of the junction profiles.
+  Shift D = -60 ... +60 min in 15-minute steps, share p = 1-15% of trips. Two models:
+    all trips   new(t) = (1 - p) x q(t) + p x q(t - D): p of the trips at every clock time move by D;
+    peak trips  p of the current peak-hour trips move by D (as in 06), other traffic stays.
+  Peak hour = 60-minute window with the most vehicles, morning start 06:00-09:59, evening 14:00-18:59, the same window
+    before and after the shift. Results: peak-hour volume change % = (new / old - 1) x 100, change of peak start in
+    minutes, and volume change % of the old peak-hour window. Total traffic is unchanged; capacity is not modelled.
+
 VÄLJUND (kaust valjund/)
   26_01_ajanihe_tipu_maht.png
       Näitab: kui palju väheneb kõigi ristmike kokku tipptunni maht nihkujate osakaalu ja nihke järgi.
@@ -44,7 +56,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from common import (load_tallinn, load_vehicles, shift_peak, peak_hour, slot_label, set_style, save, save_table,
+from common import (paeva_maatriks, load_tallinn, load_vehicles, shift_peak, peak_hour, slot_label, set_style, save, save_table,
                     AM_WINDOW, PM_WINDOW, DIVERGING, C_BLUE, C_ORANGE, TEXT2)
 
 T09_ALGUS = "2026-09-01"                                       # 2026/27 õppeaasta algus
@@ -108,7 +120,7 @@ set_style()
 # --- 15 min profiilid ---------------------------------------------------------------------------------------------------
 t, _ = load_tallinn()
 t = t[(t["paev"] >= T09_ALGUS) & (t["paevatyyp"] == "tööpäev") & (t["vaheaeg"] == "kool")]
-w15 = t.pivot_table(index=["mp_id", "paev"], columns="slot", values="v", aggfunc="sum", dropna=False)
+w15 = paeva_maatriks(t)            # puuduv pilu jääb NaN-iks (mitte 0)
 w15 = w15[w15.notna().sum(axis=1) >= 88].T.interpolate(limit_direction="both").T
 prof = {"15min": w15.groupby("mp_id").mean()}
 paevi = {"15min": w15.groupby("mp_id").size()}

@@ -32,12 +32,37 @@ ARVUTUS
     langeb, enamat tee läbi ei lase, sageli järgmise ristmiku tõttu); muidu eeldatav piir = radu x RADA_NOM
     (segaliikluse raja läbilaskevõime, alla mitme rajaga maantee tavapärase 2000-2200 sõiduauto tunnis).
   Sissesõidutee (RADIAALID): maanteeloenduri linna poole suund ja linna serva ristmiku sissesõit = ristmiku piir x
-    sissesõidu osakaal (LSS / (LSS + LVS) hommikul 07-09 logija nädala tööpäevadel; kui LSS/LVS märgisega on alla
+    sissesõidu osakaal (LSS / (LSS + LVS) hommikul 07-09 logija nädala tööpäevadel, ainult ristmiku päevad, kus kõik
+    pordid on 07-09 kaetud; kui LSS/LVS märgisega on alla
     80% ristmiku liiklusest, jääb ristmik välja). Tee piir = väiksem neist kahest (pudelikael), eraldi vaadeldud ja
     eeldatav. Tavaline hommikune sissesõit = maanteeloenduri linna poole suuna hommikutipp (algus 06:00-09:45), ilma
     maanteeloendurita ristmiku hommikutipp x sissesõidu osakaal. Tallinna sissesõidu piir = teede piiride summa.
+    "Kõik kokku" tavaline = teede tavaliste hommikutippude summa: iga tee oma tipp, mis võib olla eri kellaajal, seega
+    see on samaaegse sissesõidu ülemine hinnang. Ristmiku sissesõidu piir = ristmiku piir x sissesõidu osakaal on
+    eeldus (sissesõidu osa piirist = osa liiklusest), mitte sissesõidu manöövrite mõõdetud läbilaskevõime.
   Piirangud: C on alampiir kohtades, kus nõudlus pole kunagi läbilaskevõimet ületanud; maanteeloendurid on linnast
     7-15 km kaugusel (vahel liituv liiklus jääb välja); teedel ilma maanteeloendurita on ainult ristmik.
+
+CALCULATION IN PLAIN ENGLISH
+  Hourly flow = rolling 60-minute sum (start 06:00-19:00); the day's peak = its largest value. Workday = Mon-Fri, not a
+    holiday.
+  Observed limit C = 99th percentile of the workday peaks over the whole period. Usual peak = median of the peaks on
+    2026 autumn school workdays. Load = usual peak / C.
+  Upper limit (junction) = sum of its lanes' full levels from 24 (all lanes at their usual peak at once, so an
+    overestimate).
+  State: saturated = usual peak >= 0.9 x C and at least SEISAK_MIN min per day of stoppage on >= 10% of the junction's
+    full level; under the ceiling = >= 0.9 x C but little stoppage; spare = below 0.9 x C.
+    Stoppage minutes per day = share of measured 5-minute slots (06-19) with stoppage x 780 minutes.
+  Expected limit = C when saturated, otherwise the larger of C and the upper limit.
+  Highways: C per direction and per lane (C / lanes); free speed = 85th percentile of speed in quarter hours with flow
+    below 30% of C; speed at top flow = median speed when flow >= 90% of C; breakdown = share of workday quarter hours
+    (06-20) slower than 60% of free speed. At the limit when speed at top flow < KIIRUS_LANG x free speed or breakdown
+    >= 1%: expected limit = C; otherwise the larger of C and lanes x RADA_NOM.
+  Entry road = the smaller (bottleneck) of the highway's inbound limit and the edge junction's limit x its inbound share
+    (inbound / (inbound + outbound) vehicles 07-09, logger week, fully covered junction-days). City entry limit = sum of
+    the roads' limits. Usual inbound flow = the highway's inbound morning peak (or junction peak x inbound share); the
+    "all roads" total adds each road's own peak, which can be at different times, so it is an upper estimate of the
+    simultaneous inbound flow. Use = usual / limit x 100.
 
 VÄLJUND (kaust valjund/)
   27_01_ristmikud_piir.png
@@ -67,7 +92,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-from common import (OUT_DIR, load_tallinn, maantee_suunad, load_vehicles, load_junctions, day_calendar, set_style,
+from common import (tervetel_paevadel, paeva_maatriks, OUT_DIR, load_tallinn, maantee_suunad, load_vehicles, load_junctions, day_calendar, set_style,
                     save, save_table, C_BLUE, C_ORANGE, C_RED, C_GRAY, TEXT2, GRID)
 
 PIIR_Q = 0.99                       # vaadeldud piir = tööpäevade päevatippude 99. protsentiil
@@ -117,7 +142,7 @@ jn = load_junctions().set_index("mp_id")
 # --- ristmikud ----------------------------------------------------------------------------------------------------------
 t, _ = load_tallinn()
 kal = day_calendar(t["paev"]).set_index("paev")
-w = t.pivot_table(index=["mp_id", "paev"], columns="slot", values="v", aggfunc="sum", dropna=False)
+w = paeva_maatriks(t)            # puuduv pilu jääb NaN-iks (mitte 0)
 w = w[w.notna().sum(axis=1) >= 88].T.interpolate(limit_direction="both").T
 tipud, hommik = paevatipud(w), paevatipud(w, HOMMIK)
 rows = []
@@ -131,7 +156,7 @@ r = pd.DataFrame(rows).set_index("kood")
 k = pd.read_csv(OUT_DIR / "24_soojus_ajatelg" / "24_kanalid.csv").groupby("kood")["taistase_soid_h"].sum()
 z = pd.read_csv(OUT_DIR / "24_soojus_ajatelg" / "24_koormus_5min.csv", parse_dates=["paev"])
 z = z[z["paev"].isin(NADAL)]
-seisak = z.groupby("kood")["seisak_pct"].apply(lambda x: (x >= 10).mean() * 13 * 60)     # min tööpäevas (06-19)
+seisak = z.groupby("kood")["seisak_pct"].apply(lambda x: (x.dropna() >= 10).mean() * 13 * 60)  # min tööpäevas (06-19)
 r = r.assign(ulempiir=k, seisak_min=seisak).dropna(subset=["tavaline"])
 r["koormus"] = r["tavaline"] / r["C"]
 r["olek"] = np.where(r["koormus"] < LAGI, "varu", np.where(r["seisak_min"] >= SEISAK_MIN, "küllastunud", "lae all"))
@@ -168,7 +193,7 @@ save_table(m.reset_index().round(3), "27_maanteed_piir")
 
 # --- sissesõiduteed -----------------------------------------------------------------------------------------------------
 v = load_vehicles(None, koik=True)
-v = v[v["ts"].dt.normalize().isin(NADAL) & v["ts"].dt.hour.between(7, 8)]
+v = tervetel_paevadel(v[v["ts"].dt.normalize().isin(NADAL) & v["ts"].dt.hour.between(7, 8)], (7, 9))   # kaetud hommikud
 osa = v.groupby("mp_id")[["LSS", "LVS"]].mean()
 sis = (osa["LSS"] / (osa["LSS"] + osa["LVS"])).where(osa.sum(axis=1) >= 0.8)
 del v

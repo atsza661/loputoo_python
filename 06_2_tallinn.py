@@ -41,21 +41,44 @@ ARVUTUS
     lõiguna; madalamaid vahepilusid sisse lugemata, nii enne kui pärast) ja tipu 15 min voo vähenemine, %. Kogumaht ei
     muutu; läbilaskevõimet ei arvestata (nagu 06).
 
+CALCULATION IN PLAIN ENGLISH
+  Profiles as in 06: average of each 15-minute slot over typical workdays.
+  Speed (model A): delay per vehicle from the HCM signal formula for the slot's flow, turned into the speed on a 500 m
+    stretch at free speed 50 km/h: speed = 3.6 x 500 / (500 / (50 / 3.6) + delay). Speed only falls when flow rises.
+  Day-to-day noise: for every workday, the largest 15-minute flow and the slowest speed in the peak window, each divided
+    by its own 21-day moving median. Flow noise = 1 - (10th percentile / median) of that ratio, i.e. how much
+    smaller a light day's peak is; speed noise = 90th percentile / median - 1, i.e. how much faster a light day is.
+  Rush period, morning and evening separately:
+    peak slot = the 15 minutes with the most flow (06:00-10:00, 14:00-19:00);
+    a slot is at peak level when flow >= peak flow x (1 - flow noise), OR (speed <= peak speed x (1 + speed noise) AND
+    speed <= usual speed x (1 - speed noise), with flow at least half the peak flow); peak speed = slowest slot among
+    those with at least half the peak flow, usual speed = median slot speed 06-20. The speed test is used only when the
+    peak speed itself is below usual speed x (1 - speed noise).
+    Rush period = consecutive peak-level slots around the peak slot (one lower slot in between is allowed), within
+    05-12 or 12-21. Its threshold = the smallest flow at which a slot counts as peak level.
+  School holidays: thresholds from the reference profile (14 days before and after); change = holiday minutes at peak
+    level - reference minutes, and peak 15-minute flow change %, averaged over the holidays.
+  Spreading: share p (0-40%) of all rush-period vehicles moves by D = 15, 30 or 60 min (modes as in 06). Result =
+    minutes still at peak level with today's thresholds, and peak 15-minute flow reduction %. Total traffic does not
+    change; capacity is not modelled.
+
 VÄLJUND (kaust valjund/)
   06_2_01_profiilid.png
       Näitab: iga ristmiku tüüpilise tööpäeva kuju ja tipuaegu (pikkus erineb).
-      Kuidas: väikesed joondiagrammid, paneel ristmiku kohta, lõpus Tallinna ümbruse maanteeloendurid (türkiis joon).
-      x-telg = kellaaeg 0-24, y-telg = sõidukeid 15 min kohta. Sinine vöönd = hommikune, oranž = õhtune tipuaeg;
-      nurgas kummagi algus ja lõpp ning kestus.
+      Kuidas: väikesed joondiagrammid, paneel ristmiku kohta, lõpus Tallinna ümbruse maanteeloendurid (türkiis joon;
+      sama koha linna sisse ja linnast välja järjest). x-telg = kellaaeg 0-24, y-telg = sõidukeid 15 min kohta.
+      Sinine vöönd = hommikune, oranž = õhtune tipuaeg; nurgas kummagi algus ja lõpp ning kestus.
   06_2_02_profiil_heatmap.png
       Näitab: kuidas liiklus päeva peale jaotub ja kui pikk on tipuaeg, kõik ristmikud kõrvuti.
       Kuidas: soojuskaart; rida = ristmik (järjestatud hommikuse tipuaja alguse järgi; maanteeloendurid musta joone
-      all), veerg = 15 min pilu. Värv = pilu osakaal ööpäeva liiklusest, % (tumedam = suurem; skaala otstes vähim ja
-      suurim). Sinine ja oranž kriips = hommikune ja õhtune tipuaeg.
+      all, sama koha sisse ja välja järjest, koht oma varasema hommikuse tipuaja järgi), veerg = 15 min pilu. Värv =
+      pilu osakaal ööpäeva liiklusest, % (tumedam = suurem; skaala otstes vähim ja suurim). Sinine ja oranž kriips =
+      hommikune ja õhtune tipuaeg.
   06_2_03_tipptunnid.png
       Näitab: millal tipuaeg igal ristmikul algab ja lõpeb.
-      Kuidas: rida = ristmik, x-telg = kellaaeg. Sinine riba = hommikune, oranž = õhtune tipuaeg, riba järel kestus.
-      Taustavöönd = kõigi ristmike summa tipuaeg; punktiir = 60 min pikkus (06 tipptund) riba alguses.
+      Kuidas: rida = ristmik (järjestus nagu 06_2_02), x-telg = kellaaeg. Sinine riba = hommikune, oranž = õhtune
+      tipuaeg, riba järel kestus. Taustavöönd = kõigi ristmike summa tipuaeg; punktiir = 60 min pikkus (06 tipptund)
+      riba alguses.
   06_2_04_koolivaheajad_ristmikud.png
       Näitab: kui palju lühem on tipuaeg lühikese koolivaheaja ajal igal ristmikul.
       Kuidas: punktdiagramm; rida = ristmik, x-telg = tipuaja tasemel minutite muutus vaheajal (vs 2 nädalat enne ja
@@ -85,7 +108,7 @@ import seaborn as sns
 from common import (OUT_DIR, SUUND, STS_AKNAD, TIPUAJA_ALA, load_tallinn, load_junctions, tooaeva_profiilid,
                     mudeli_parameetrid, ristmike_kiirus, ristmike_tipumura, tipu_mura, tipuaja_lavi, tipuaeg,
                     tipuaja_naitajad, shift_peak, peak_hour, short_name, slot_label, set_style, save, save_table,
-                    otsamargid, AM_WINDOW, C_BLUE, C_ORANGE, C_AQUA, C_GRAY, TEXT2)
+                    otsamargid, suunad_korvuti, AM_WINDOW, C_BLUE, C_ORANGE, C_AQUA, C_GRAY, TEXT2)
 
 assert not SUUND, "06_2 teeb ainult mõlemad suunad koos (SUUND ei kehti)"
 PH = 4                                   # 15 min pilud
@@ -174,7 +197,8 @@ pm = pd.DataFrame(rows)
 save_table(pm, "06_2_tipptunnid")
 silt = {**j["silt"].to_dict(), **{k: f"Maantee: {r.koht}" for k, r in hw.iterrows()}}
 order = pm[pm.mp_id > 0].sort_values(["hommik_algus_h", "hommik_lopp_h"])["mp_id"].tolist()
-hw_order = pm[pm.mp_id < 0].sort_values(["hommik_algus_h", "hommik_lopp_h"])["mp_id"].tolist()
+hw_order = suunad_korvuti(pm[pm.mp_id < 0].set_index("mp_id").join(hw[["id", "linn", "suund"]]), ["id", "linn"], "suund",
+                          ["hommik_algus_h", "hommik_lopp_h"])           # sama koha sisse ja välja järjest
 allp = pd.concat([prof.set_axis(range(96), axis=1), hprof])
 P = pm.set_index("mp_id")
 n, n_all = len(prof), len(prof) + len(hprof)
@@ -265,7 +289,8 @@ for _, b in breaks.iterrows():
     for mp in ref.index.intersection(brk.index).intersection(mura.index.get_level_values(0)):
         if ref.loc[mp].isna().sum() > PH or brk.loc[mp].isna().sum() > PH:    # üle 1 h puudu
             continue
-        vr, vb = ref.loc[mp].fillna(0).to_numpy(), brk.loc[mp].fillna(0).to_numpy()
+        vr, vb = (ref.loc[mp].interpolate(limit_direction="both").to_numpy(),    # kuni 1 h auke täidetakse
+                  brk.loc[mp].interpolate(limit_direction="both").to_numpy())
         sr, sb = kiirus(mp, np.vstack([vr, vb]))
         lv = lavid(vr, mp, sr)
         for tp in STS_AKNAD:

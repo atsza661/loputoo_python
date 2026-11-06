@@ -21,6 +21,15 @@ ARVUTUS
   Erandpäev: standardiseeritud jääk |z| >= Z_ERAND, z = jääk / (1,4826 x jääkide MAD) (robustne, erandid ise ei
     suurenda hajuvust). Kõrvalekalle % = 100 x (exp(jääk) - 1).
 
+CALCULATION IN PLAIN ENGLISH
+  Regression (ordinary least squares): log(day index) = constant + weekday + school holiday on a workday + big holiday,
+    other holiday, holiday on a weekend, shortened day + seasonal waves sin/cos(2 pi k day / 365.25), k = 1, 2 + trend.
+  Effect % = 100 x (exp(coefficient) - 1): how much traffic changes with that feature when everything else is equal.
+    95% interval with Newey-West standard errors (HAC, 7-day lag).
+  Explained share: drop in R^2 when a group of features is left out of the model.
+  Exceptional day: |z| >= Z_ERAND, z = residual / (1.4826 x median absolute residual). Deviation % = 100 x
+    (exp(residual) - 1); the grey band on the chart uses the same transformation, so it is not symmetric.
+
 VÄLJUND (kaust valjund/)
   36_01_lagundus.png
       Näitab: millised kalendritunnused muudavad linna liiklust kõige rohkem ja kui palju kõikumisest need seletavad.
@@ -165,7 +174,7 @@ b1.set_title(f"Päeva liiklus ja kalendrimudel: jääkide hajuvus {100 * mad:.1f
 b1.legend(loc="lower left", fontsize=9)
 on = d["z"].abs() >= Z_ERAND
 b2.axhline(0, color=TEXT, lw=0.8)
-b2.axhspan(-100 * Z_ERAND * mad, 100 * Z_ERAND * mad, color=GRID, alpha=0.6, lw=0)
+b2.axhspan(100 * np.expm1(-Z_ERAND * mad), 100 * np.expm1(Z_ERAND * mad), color=GRID, alpha=0.6, lw=0)   # %-skaalal asümmeetriline
 b2.scatter(d.loc[~on, "paev"], d.loc[~on, "korvalekalle_pct"], s=6, color=C_GRAY, alpha=0.7)
 b2.scatter(d.loc[on, "paev"], d.loc[on, "korvalekalle_pct"], s=18, color=C_RED, zorder=3)
 sl = er.reindex(er["z"].abs().sort_values(ascending=False).index).head(SILTE)

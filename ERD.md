@@ -1,6 +1,6 @@
 # Andmebaasi skeem (ERD)
 
-Analüüsiskriptid loevad kõik andmed PostgreSQL-i andmebaasist (`common.py`: `sql`, `tabel`, `puhver`). Andmebaasis on 18 tabelit kolmes skeemis: `highway` (maanteed), `fuel` (kütusemüük) ja `tallinn` (Tallinna ristmikud). Ridade arv ja periood seisuga 05.11.2026.
+Analüüsiskriptid loevad kõik andmed PostgreSQL-i andmebaasist (`common.py`: `sql`, `tabel`, `puhver`). Andmebaasis on 18 tabelit kolmes skeemis: `highway` (maanteed), `fuel` (kütusemüük) ja `tallinn` (Tallinna ristmikud). Ridade arv ja periood seisuga 06.11.2026.
 
 Diagrammis on skeem ja tabel ühendatud alakriipsuga (`highway_counter` = `highway.counter`). Pidev joon on andmebaasi välisvõti; katkendjoon on loogiline seos, mida kasutab analüüsikood, või sobitus nime või numbri järgi (silt algab sõnaga „sobitus”). Vahemikuveerud (nt `cls_1` … `cls_10`) on näidatud esimese veeruna.
 
@@ -163,11 +163,11 @@ erDiagram
 | - | - | - | - | - |
 | `highway.counter` | maanteede püsiloendurite asukohad | 147 |  | counter_id |
 | `highway.counter_raw` | loendurijaamade algne loend (koordinaadid parandamata) | 147 |  | – |
-| `highway.road_mileage_yearly` | põhimaanteede aastane läbisõit, mln sõidukikm | 14 |  | – |
+| `highway.road_mileage_yearly` | riigiteede aastane läbisõit, mln sõidukikm (12 põhimaanteed, tugi- ja kõrvalmaanteed kokku) | 14 |  | – |
 | `highway.counter_channel` | loenduri rajad (kanalid) ja nende nimed | 302 |  | counter_id, channel |
 | `highway.datex_site` | DATEX II mõõtekohad | 233 |  | site_id |
 | `highway.datex_flow_15min` | DATEX II 15 min vood ja kiirused | 16 254 | 08.09–01.10.2026 | site_id, ts_end |
-| `highway.count_hourly` | püsiloendurite tunniloendused klasside ja kiirusvahemike kaupa | 15 037 858 | 01.01.2019–31.10.2026 | – |
+| `highway.count_hourly` | püsiloendurite tunniloendused klasside ja kiirusvahemike kaupa | 15 030 638 | 01.01.2019–31.10.2026 | – |
 | `highway.count_15min` | samade loendurite 15 min loendused | 22 465 472 | 01.01.2019–04.10.2026 | – |
 | `fuel.petrol_county_monthly` | bensiinimüük maakonniti, kuu kaupa | 91 | 02.2019–08.2026 | – |
 | `fuel.diesel_county_monthly` | diislimüük maakonniti, kuu kaupa | 91 | 02.2019–08.2026 | year, month |
@@ -187,11 +187,3 @@ erDiagram
 - Kirjeldustabel on ainsuses nimisõna (`counter`, `junction`); mõõtmistabel on mõõdik ja ajasamm (`count_hourly`, `count_15min`, `retail_semimonthly`); sündmuste tabel on nimetatud sündmuse järgi (`vehicle_passage`).
 - Viitav veerg kannab viidatava võtme nime (`counter_id`, `junction_id`, `junction_code`).
 - `ts` on intervalli algus, sõidukikirjetel sündmuse aeg; DATEX-i `ts_end` on 15 min akna lõpp.
-
-## Märkused
-
-- Välisvõtmeid on neli, kõik kirjeldustabelitel. Mõõtmistabelite seosed on kirjas analüüsikoodis; 05.11.2026 kontrollis iga seose: seoseta ridu ei ole.
-- Primaarvõti puudub tabelitel `highway.count_hourly`, `highway.count_15min` ja `tallinn.vehicle_passage`. Tunnitabelis on vanu kordusridu aastatest 2019–2021 (erinevate väärtustega), millega `load_daily()` arvestab.
-- Kütusemüük seotakse loendustega aja järgi (`year`, `month`). Maakonnatabelites on iga maakond eraldi veerg: `highway.counter.county` väiketähtedega, sidekriips alakriipsuks, annab veeru nime (Harju → `harju`, Ida-Viru → `ida_viru`).
-- `highway.counter_raw` on algne jaamade loend; `highway.counter` on sama loend, kus neli koordinaati on 21.10.2026 DATEX-i järgi parandatud.
-- Analüüsikood kasutab sisemiselt endisi veerunimesid (`id`, `kanal`, `aeg`, `"1"`…`"10"` jne): päringud ja `common.tabel()` nimetavad veerud tagasi (`common.VANAD_VEERUD`), nii et joonised ja väljundtabelid ei muutunud.

@@ -24,6 +24,13 @@ ARVUTUS
   ponytail: sõidukite summas on rikke ajal puuduvad kanalid 0 (24 loeb sõidukeid ka rikkega kanalitel), seega päeval
   rikkega (17.-19.10 port 63) on summa veidi väiksem; koormusaste rikkeid arvesse ei võta.
 
+CALCULATION IN PLAIN ENGLISH
+  Day types: Tuesday-Thursday (average of 20-22 Oct), Monday, Friday (average of 16 and 23 Oct), Saturday, Sunday.
+  Junction load for a day type = average of its days' loads (from 24) at the same clock time; missing days are left out.
+  Map surface and same-load lines as in 23 (Gaussian-weighted average), one colour scale for all maps.
+  Side chart: sum of all junctions' vehicles per 5-minute slot (average of the type's days; x 12 = per hour) and the
+    average junction load at each clock time.
+
 VÄLJUND (kaust valjund/25_soojus_paevatyybid/)
   25_01_<tüüp>_<HHMM>.png   (5 tüüpi x 156 kaarti; tüüp = t-n, e, r, l, p)
       Näitab: kui koormatud on Tallinna ristmikud päevatüübi ühel 5 minutil ja kuidas koormus linnas paikneb.

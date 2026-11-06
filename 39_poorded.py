@@ -11,9 +11,17 @@ ARVUTUS
   Päevad: logija nädala tööpäevad (NADAL). Tipud: hommik 07:00-09:00, õhtu 16:00-18:00 (TIPUD).
   Ristmikud (RISTMIKUD): MP01, MP08, MP19, MP13 - kõigil on iga kanali lähte- ja sihtsuund teada (100% sõidukitest),
     MP08, MP19 ja MP13 on 27 järgi küllastunud, MP01 on logija andmetes suurim.
-  Voog = kanali sõidukid tipuaknas / (päevi x 2 h), sõidukit tunnis; kanalid, mille lähte- ja sihtsuund on samad,
+  Voog = kanali sõidukid tipuaknas / (ristmiku kaetud tipupäevi x 2 h), sõidukit tunnis (ainult päevad, kus kõik
+    ristmiku pordid on tipuaknas kaetud, common.tervetel_paevadel); kanalid, mille lähte- ja sihtsuund on samad,
     liidetakse (üks manööver võib olla mitmel rajal). Haru nimi: number eest ära, " side" -> " pool".
   Iga haru sisse- ja väljasõit = selle haru voogude summa (lähte- või sihtsuunana); kõik voog kokku on mõlemal pool sama.
+
+CALCULATION IN PLAIN ENGLISH
+  Logger-week workdays, peaks 07-09 and 16-18, four junctions where every lane's origin and destination arm is known.
+  Flow of a movement = its vehicles in the peak window / (the junction's fully covered peak days x 2 h), vehicles per
+    hour; lanes with the same origin and destination are added.
+  Arm inflow and outflow = sum of the flows starting or ending at that arm; total in = total out.
+  Share = movement flow / junction total flow x 100.
 
 VÄLJUND (kaust valjund/)
   39_01_poorded.png
@@ -32,7 +40,7 @@ import matplotlib.pyplot as plt
 from matplotlib.path import Path
 from matplotlib.patches import PathPatch, Rectangle
 
-from common import (load_vehicles, load_manoeuvres, load_junctions, set_style, save, save_table, short_name, C_BLUE,
+from common import (tervetel_paevadel, load_vehicles, load_manoeuvres, load_junctions, set_style, save, save_table, short_name, C_BLUE,
                     C_ORANGE, C_AQUA, C_VIOLET, C_MAGENTA, C_GRAY, TEXT, TEXT2)
 
 NADAL = pd.to_datetime(["2026-10-16", "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"])
@@ -82,10 +90,13 @@ v = v[v["mp_id"].isin(RISTMIKUD) & v["ts"].dt.normalize().isin(NADAL)]
 paevi = v["ts"].dt.normalize().nunique()
 rows = []
 for tipp, (h0, h1) in TIPUD.items():
-    z = v[v["ts"].dt.hour.between(h0, h1 - 1)].groupby(["mp_id", "kanal"]).size().rename("n").reset_index()
+    vt = tervetel_paevadel(v[v["ts"].dt.hour.between(h0, h1 - 1)], (h0, h1))   # ainult kaetud tipud
+    pj = vt.groupby("mp_id")["ts"].agg(lambda s: s.dt.normalize().nunique())   # ristmiku kaetud tipupäevad
+    z = vt.groupby(["mp_id", "kanal"]).size().rename("n").reset_index()
     z = z.merge(dm[["mp_id", "channel", "lahe", "siht"]], left_on=["mp_id", "kanal"], right_on=["mp_id", "channel"])
     g = z.groupby(["mp_id", "lahe", "siht"])["n"].sum().reset_index()
-    g["soid_h"] = g["n"] / (paevi * (h1 - h0))
+    g["paevi"] = g["mp_id"].map(pj)
+    g["soid_h"] = g["n"] / (g["paevi"] * (h1 - h0))
     rows.append(g.assign(tipp=tipp))
 p = pd.concat(rows, ignore_index=True)
 p["osakaal_pct"] = 100 * p["soid_h"] / p.groupby(["mp_id", "tipp"])["soid_h"].transform("sum")

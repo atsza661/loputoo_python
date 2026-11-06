@@ -29,9 +29,24 @@ ARVUTUS
   Naabrid: kõrvalasuvate ristmike paarid (A = kesklinnale lähem). Kõrvalekalle = koormus - sama ristmiku ja suuna
     tööpäevade keskmine samal kellaajal (päevaomane ummik, mitte tavaline päevarütm). Ristkorrelatsioon nihkega
     -30...+30 min (5 min samm, päeva sees): suurim r ja selle nihe (positiivne = B järgneb A-le). Koos koormatud:
-    tõste = P(B koormatud | A koormatud) / P(B koormatud) (1 = sõltumatud, > 1 = koormatud koos).
+    tõste = P(B koormatud | A koormatud) / P(B koormatud) (1 = sõltumatud, > 1 = koormatud koos); ainult pilud, kus
+    mõlemal ristmikul on koormus mõõdetud (puuduv ei ole "koormamata"), nende arv = pilusid.
   Pikaajaline sagedus (15 min, kõik suunad kokku): iga ristmiku tunnivoog (liikuv 60 min summa) tööpäevadel
     2024-2026; osa päevadest, mil tunnivoog algusega sel kellaajal on >= LAE_OSA x C (27).
+
+CALCULATION IN PLAIN ENGLISH
+  Corridor = junctions in street order from the centre; position = straight-line distances between neighbours added up.
+  Load per direction as in 24: lane state per 5 minutes, lane load = min(q / full level, 1) (1 in stoppage); direction
+    load = lanes' loads weighted by their full levels (faulty lanes left out; missing when under half the weight).
+  Loaded = direction load >= KOORMATUD% for at least KESTUS minutes (gaps up to 5 min bridged); start = first loaded
+    stretch in the peak window.
+  Spread = slope (min per km) of loaded-start time against position among the day's loaded junctions; median over days
+    (positive = starts in the centre and grows outwards).
+  Neighbours: deviation = load - the same junction's and direction's workday average at that clock time. Cross-
+    correlation with lags -30 ... +30 min: largest r and its lag. Lift = P(B loaded | A loaded) / P(B loaded), counted
+    only over 5-minute slots where both junctions were measured.
+  Long-term frequency (15-minute counts, 2024-2026 workdays): share of days on which the hourly flow starting at that
+    clock time is >= LAE_OSA x C (27).
 
 VÄLJUND (kaust valjund/)
   28_01_koridorid_ajaruum.png
@@ -40,7 +55,7 @@ VÄLJUND (kaust valjund/)
       ristmik koridori järjekorras (ülal kesklinna ots, sildis kaugus km). Värv = suuna koormus % (6 tööpäeva
       keskmine; kollane = vaba, punane = täis; hall = selle suuna kanaleid pole), must joon = koormus KOORMATUD%
       (15 min silutud), must täpp = keskmiselt >= 5% suuna täistasemest seisab.
-  28_paevad_<koridor>.png (tartu, paldiski, tammsaare, sopruse)
+  28_02_paevad_tartu.png, 28_03_paevad_paldiski.png, 28_04_paevad_tammsaare.png, 28_05_paevad_sopruse.png
       Näitab: sama iga tööpäeva kohta eraldi: kas ummiku muster kordub.
       Kuidas: read = suund (sisse, välja, kõik), veerud = tööpäevad; värv nagu eelmisel, must kontuur = koormatud
       (>= KOORMATUD%).
@@ -58,7 +73,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-from common import (OUT_DIR, load_vehicles, channel_direction, load_tallinn, load_junctions, day_calendar, km, loigud,
+from common import (paeva_maatriks, OUT_DIR, load_vehicles, channel_direction, load_tallinn, load_junctions, day_calendar, km, loigud,
                     set_style, save, save_table, TEXT2)
 
 KORIDORID = {"Tartu mnt": [34, 35, 39, 19], "Paldiski mnt": [7, 3, 12, 11, 16],
@@ -208,10 +223,11 @@ for kor, ms in KORIDORID.items():
             xa, xb = A.loc[(sd, a)].reindex(NADAL).values, A.loc[(sd, b)].reindex(NADAL).values
             r = {L * SAMM: ristkorr(xa, xb, L) for L in range(-NIHE, NIHE + 1)}
             L = max(r, key=lambda x: -np.inf if np.isnan(r[x]) else r[x])
-            ka = np.nan_to_num(K.loc[(sd, a)].reindex(NADAL).values) >= KOORMATUD
-            kb = np.nan_to_num(K.loc[(sd, b)].reindex(NADAL).values) >= KOORMATUD
+            za, zb = K.loc[(sd, a)].reindex(NADAL).values, K.loc[(sd, b)].reindex(NADAL).values
+            mo = np.isfinite(za) & np.isfinite(zb)                    # ainult pilud, kus mõlemad on mõõdetud
+            ka, kb = za[mo] >= KOORMATUD, zb[mo] >= KOORMATUD
             paarid.append(dict(koridor=kor, A=jn.loc[a, "code"], B=jn.loc[b, "code"], vahe_km=asukoht[kor][b] - asukoht[kor][a],
-                               suund=sd, r_0=r[0], r_max=r[L], nihe_min=L,
+                               suund=sd, r_0=r[0], r_max=r[L], nihe_min=L, pilusid=int(mo.sum()),
                                p_B=kb.mean(), p_B_kui_A=kb[ka].mean() if ka.any() else np.nan,
                                tost=kb[ka].mean() / kb.mean() if ka.any() and kb.any() else np.nan))
 paarid = pd.DataFrame(paarid)
@@ -225,7 +241,7 @@ print(paarid.round(2).to_string())
 t, _ = load_tallinn()
 t = t[t["mp_id"].isin(mps)]
 kal = day_calendar(t["paev"]).set_index("paev")
-w15 = t.pivot_table(index=["mp_id", "paev"], columns="slot", values="v", aggfunc="sum", dropna=False)
+w15 = paeva_maatriks(t)            # puuduv pilu jääb NaN-iks (mitte 0)
 w15 = w15[w15.notna().sum(axis=1) >= 88].T.interpolate(limit_direction="both").T
 w15 = w15[kal.reindex(w15.index.get_level_values("paev"))["paevatyyp"].values == "tööpäev"]
 tund = w15.T.rolling(4).sum().shift(-3).T.loc[:, 24:75]

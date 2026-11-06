@@ -15,27 +15,43 @@ ARVUTUS
   2) Liigi- ja kiirussumma kooskõla. Sama kanal-päeva sõidukid on loetud kaks korda - klasside ja kiirusvahemike
      kaupa. Leitakse ridade osakaal, kus need summad erinevad üle 0,5 sõiduki, ja erinevuse suurus protsendina
      kõigist sõidukitest.
-  3) Kehtivad loendurid (common.counter_month). Päev kehtib, kui tunniridu on 23-25 (või 44-50; siis teisendatakse
-     summad 24 tunnile) ja sõidukeid on üle nulli. Kanal-kuu kehtib, kui kehtivaid päevi on >= 15. Loendur-kuu
+  3) Kehtivad loendurid (common.counter_month). Päev kehtib, kui eri tunde on 23-25 (korduvad tunnid keskmistatakse,
+     common.load_daily) ja sõidukeid on üle nulli. Kanal-kuu kehtib, kui kehtivaid päevi on >= 15. Loendur-kuu
      kehtib, kui kehtivate kanalite arv ei ole väiksem loenduri tavalisest kanalite arvust (ühe raja väljalangemine
      ei tohi paista liikluse langusena). Iga kuu kohta loetakse kehtivate loendurite arv.
   4) Kahtlased loendur-kuud: maht erineb sama loenduri sama kalendrikuu mediaanist üle 1,75 korra või alla
      0,4 korra (common.volume_anomaly) või mõne sõidukiklassi osakaal erineb loenduri enda mediaanist üle
      25 protsendipunkti (common.class_anomaly).
 
+CALCULATION IN PLAIN ENGLISH
+  1) Hours per day. For every counter lane and day, the database rows of that day are counted. A day with 23-25
+     different hours is complete (23 and 25 happen on clock-change days); an hour stored more than once is averaged
+     first. Bar length = lane-days in a class / all lane-days of that year x 100.
+  2) Class total vs speed total. The counter counts each vehicle twice: by vehicle class and by speed band. Result 1 =
+     share of rows where the two totals differ by more than 0.5 vehicles. Result 2 = sum of |class total - speed total|
+     / sum of class totals x 100.
+  3) Valid counters per month. A lane-month is valid with at least 15 complete days. A counter-month is valid when it
+     has at least as many valid lanes as the counter usually has. Monthly line = number of valid counter-months,
+     leaving out the months flagged in 4).
+  4) Suspicious months. Counter's average daily traffic in the month / median of the same calendar month over all
+     years of that counter. Above 1.75 or below 0.4 = suspicious volume. A vehicle class whose share differs from the
+     counter's own median share by more than 25 percentage points = suspicious class split.
+
 VÄLJUND (kaust valjund/)
   01_01_tunnid_paevas.png
       Näitab: kui suur osa iga aasta kanal-päevadest on täielikud, osalised või topelt imporditud (arvutus 1).
+      Pärast 2019. a laadimise parandust (06.11.2026) topelt imporditud päevi ei ole.
       Kuidas: rõhtsad virnastatud tulbad, üks tulp aasta kohta (varaseim üleval); x-telg = osakaal kanal-päevadest, %.
       Punane = osaline päev, sinine = täispäev, oranž = topelt imporditud, hall = muud.
   01_02_loendurid_kuus.png
       Näitab: mitu loendurit annab igas kuus kasutatavaid andmeid (arvutus 3).
-      Kuidas: joondiagramm; x-telg = aeg (märgid aastate kaupa), y-telg = kehtivate loendurite arv (algab nullist).
+      Kuidas: joondiagramm; x-telg = aeg (märgid aastate kaupa), y-telg = kehtivate loendurite arv (algab nullist);
+      kahtlase mahuga loendur-kuud (arvutus 4) ei ole loetud.
   01_03_kaetus_heatmap.png
       Näitab: millistel kuudel on iga loenduri andmed kasutatavad.
       Kuidas: ruudustik; rida = loendur (silt "maakond · nimi", järjestatud maakonna ja teenumbri järgi), veerg = kuu
-      analüüsiakna algusest lõpuni (x-teljel aastad). Sinine ruut = kehtiv loendur-kuu, hele ruut = andmeid pole või
-      need ei kehti.
+      analüüsiakna algusest lõpuni (x-teljel aastad). Sinine ruut = kehtiv loendur-kuu, oranž = kehtiv, kuid kahtlase
+      mahuga (analüüsidest välja jäetud), hele ruut = andmeid pole või need ei kehti.
   01_kvaliteet_loendurid.csv     iga loenduri kanal-päevade arv, kehtivate osakaal, topeltpäevad, esimene ja viimane
                                  päev, kehtivate kuude arv
   01_kahtlased_loendurkuud.csv   kahtlase mahu või klassijaotusega loendur-kuud (arvutus 4)
@@ -86,26 +102,26 @@ mismatch_rel = np.abs(tot_c - tot_s).sum() / tot_c.sum() * 100
 # 3) Kehtivad loendurid kuus ----------------------------------------------------
 cm = counter_month(d)
 cm = cm.merge(loc[["id", "maakond", "nimi", "tee_nr"]], on="id", how="left")
-n_month = cm.groupby("kuu")["id"].nunique()
+n_month = cm[~cm["maht_kahtlane"]].groupby("kuu")["id"].nunique()        # kahtlase mahuga kuud ei ole kasutatavad
 
 fig, ax = plt.subplots(figsize=(9, 3.8))
 ax.plot(n_month.index.to_timestamp(), n_month.values, color=C_BLUE)
 ax.set_ylim(0, None)
 ax.set_ylabel("Loendureid")
-ax.set_title("Kehtivate loendurite arv kuus (≥15 täispäeva, kõik suunad)")
+ax.set_title("Kehtivate loendurite arv kuus (≥15 täispäeva, kõik suunad, kahtlase mahuga kuud välja)")
 month_axis(ax)
 save(fig, "01_02_loendurid_kuus")
 
 # 4) Heatmap: loendur x kuu -------------------------------------------------------
 months = pd.period_range(START, END, freq="M")
-valid = (cm.assign(v=1).pivot_table(index="id", columns="kuu", values="v", aggfunc="max")
+valid = (cm.assign(v=np.where(cm["maht_kahtlane"], 2, 1)).pivot_table(index="id", columns="kuu", values="v", aggfunc="max")
          .reindex(columns=months).fillna(0))
 order = (loc.set_index("id").loc[valid.index, ["maakond", "tee_nr"]]
          .sort_values(["maakond", "tee_nr"]).index)
 valid = valid.loc[order]
 fig, ax = plt.subplots(figsize=(10, 14))
-ax.imshow(valid.values, aspect="auto", cmap=plt.matplotlib.colors.ListedColormap(["#f0efec", C_BLUE]),
-          interpolation="nearest")
+ax.imshow(valid.values, aspect="auto", cmap=plt.matplotlib.colors.ListedColormap(["#f0efec", C_BLUE, C_ORANGE]),
+          interpolation="nearest", vmin=0, vmax=2)
 ax.set_yticks(range(len(valid)))
 lab = loc.set_index("id").loc[valid.index]
 ax.set_yticklabels([f"{m} · {n}" for m, n in zip(lab["maakond"], lab["nimi"])], fontsize=5.5)
@@ -113,7 +129,7 @@ xt = [i for i, m in enumerate(months) if m.month == 1]
 ax.set_xticks(xt)
 ax.set_xticklabels([months[i].year for i in xt])
 ax.grid(False)
-ax.set_title("Loendurite kehtivad kuud (sinine = kasutatav)")
+ax.set_title("Loendurite kehtivad kuud (sinine = kasutatav, oranž = kahtlane maht, välja jäetud)")
 save(fig, "01_03_kaetus_heatmap")
 
 # 5) Tabelid -----------------------------------------------------------------------
@@ -140,7 +156,7 @@ summary = pd.DataFrame([
     ("Loendureid asukohatabelis", len(loc)),
     ("Kanal-päevi kokku", len(d)),
     ("Kehtivaid kanal-päevi, %", d["kehtiv"].mean() * 100),
-    ("Topelt imporditud kanal-päevi (44-50 h)", int(d["duplikaat"].sum())),
+    ("Korduvate tundidega kanal-päevi (keskmistatud)", int(d["duplikaat"].sum())),
     ("2019 osaliste päevade osakaal, %", (d.loc[d.aasta == 2019, "hours"] <= 22).mean() * 100),
     ("Liigi- ja kiirussumma erinevad, % ridadest", mismatch_share),
     ("Liigi- ja kiirussumma erinevus, % sõidukitest", mismatch_rel),

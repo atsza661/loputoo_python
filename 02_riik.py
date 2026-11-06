@@ -30,6 +30,27 @@ ARVUTUS
     rea aastane muutus (24 poolkuud) ja nende korrelatsioon, kui müüki nihutada -4...+4 poolkuud (positiivne nihe =
     müük järgneb liiklusele).
 
+CALCULATION IN PLAIN ENGLISH
+  Traffic index (one number per month): add up the average daily traffic of the counters that have valid data in the
+    month, divide by the 2023 averages of the same counters added up, multiply by 100. The same counters are on both
+    sides of the division, so a counter starting or stopping does not make a jump. A month needs at least 3 counters;
+    suspicious counter-months are left out. Separate indexes for all vehicles, light (classes 1-3), heavy (4-10) and
+    lorries (6-8).
+  Sales index: litres sold per day (month's litres / days in the month) / 2023 average x 100.
+  Each traffic-sales pair is compared three ways:
+    level  the two indexes as they are;
+    YoY    year-on-year change = (ln of this month - ln of the same month a year earlier) x 100, close to a % change;
+           missing months are inserted as gaps, so the comparison is always exactly 12 months back;
+    STL    the log series is split into trend + seasonal pattern + remainder (12-month season, on the longest stretch
+           without gaps); remainder x 100 is compared. This is the strictest test.
+  Correlation: Pearson r and Spearman rho over the months both series have (at least 6), and again without the COVID
+    months (March-June 2020; for YoY also the same months of 2021, which are compared with them).
+  Elasticity: regression of ln(sales) on ln(traffic) with one dummy per calendar month and a linear trend. The traffic
+    coefficient = % change in sales when traffic changes 1%. Standard errors allow for autocorrelation (HAC, 3 lags).
+  Lagged correlation: the same traffic index for half-months (1st-15th, 16th-end; a lane needs 7 valid days); both
+    series as year-on-year change over 24 half-months (missing half-months as gaps); correlation when sales are shifted
+    -4 ... +4 half-months.
+
 VÄLJUND (kaust valjund/)
   02_01_aegread.png
       Näitab: kas liiklus ja kütusemüük liiguvad ajas koos.
@@ -178,6 +199,9 @@ d["pool"] = d["paev"].dt.strftime("%Y-%m") + "-" + np.where(d["paev"].dt.day > 1
 ch = counter_month(d, min_days=7, key="pool")
 hb = pd.DataFrame({g: traffic_index(ch, value=g, key="pool").set_index("pool")["indeks"]
                    for g in ["kerge", "raske"]}).join(bw, how="inner").sort_index()
+pooled = pd.date_range(hb.index.min(), hb.index.max(), freq="SMS-16").strftime("%Y-%m-%d")   # kõik poolkuud (1. ja 16.)
+assert set(hb.index) <= set(pooled)
+hb = hb.reindex(pooled)                     # puuduv poolkuu NaN-ina: yoy(24) võrdleb siis alati sama poolkuud aasta tagasi
 
 lags = range(-4, 5)
 lag_rows = []
