@@ -48,7 +48,10 @@ CALCULATION IN PLAIN ENGLISH
                     vehicles under 40 km/h; ks = sum of (vehicles x band middle speed); kn = vehicles with a speed;
                     mean speed = ks / kn. A quarter hour stored twice is averaged.
     maantee_suunad  direction = counter + the two ends of the lane name; lanes added, only quarter hours where all
-                    lanes of the direction exist.
+                    lanes of the direction exist. A direction-day is dropped when a lane is faulty: its share of the
+                    direction's day (lane / direction total) is below 1/4 of its usual share (median share over all
+                    days since 08.2024; only lanes with a usual share >= 5%), or above 2.5 x the usual share and at
+                    least 5 points more, or the whole direction counts 0.
   Tallinn junctions (15 minutes):
     load_tallinn    clock-change night slots, and zeros where the slot usually has >= 20 vehicles (a fault), become
                     missing. A day is invalid when more than 2 h are missing or its total / usual same-weekday total is
@@ -57,9 +60,13 @@ CALCULATION IN PLAIN ENGLISH
     paeva_maatriks  slots of a day side by side; a slot with only missing values stays missing (not 0).
   Per-vehicle records:
     load_vehicles   heartbeat rows (speed, length and number all 0) dropped; rows repeating a timestamp or a detector
-                    number dropped; speed code 255 = no speed.
-    soidukite_kaetus  uncovered minutes per junction-hour = silences longer than 15 min on ports that send regular
-                    heartbeats; tervetel_paevadel keeps junction-days with every hour 05-23 covered (<= 6 min gap).
+                    number dropped; speed code 255 = no speed. Before dropping repeated numbers the raw rows are
+                    checked for a counter reset (number falls by more than 10 000 in time order): then it stops.
+    soidukite_kaetus  uncovered minutes per junction-hour = overlap of the hour with silences longer than 15 min on
+                    ports that send regular heartbeats (shorter silences are not counted). A port with few heartbeats
+                    cannot be checked: if such ports carry >= 1% of the junction's vehicles, or the junction has no
+                    regular port, its coverage is unknown (never counted as covered). tervetel_paevadel keeps
+                    junction-days where in every hour 05-23 long silences cover at most 6 minutes.
     five_min_shares, to_5min  15-minute value x share of its three 5-minute parts on the per-vehicle day.
     direction_share  inbound or outbound share of each 15-minute slot from the per-vehicle day.
   Peaks and spreading:
@@ -75,7 +82,8 @@ CALCULATION IN PLAIN ENGLISH
     hcm_viivitus    HCM 2010 delay d1 + d2 (see 40_0); kiirus_viivitusest = 3.6 x 500 / (500 / (50 / 3.6) + delay).
     pav             least-squares monotone fit; equal x values are first averaged into one point (weight = count);
                     returns the fitted value at every distinct x.
-    tunni_keskmine  rolling 4-slot weighted average = sum(value x weight) / sum(weight); weight-0 slots are ignored.
+    tunni_keskmine  rolling 4-slot weighted average = sum(value x weight) / sum(weight); weight-0 slots are ignored;
+                    a window with a missing value (or weight) of positive weight is missing, later windows are not.
     stsenaarium     yt: all traffic x (1 - p); nihe: p of the peak-hour slots moves half D earlier, half D later;
                     kadu: the same p of the peak-hour slots disappears.
     sts_voit        A: (speed after / speed before - 1) x 100; B: congestion share before - after.
@@ -584,11 +592,39 @@ def ilma_vigaste_kuudeta(x, cm, aeg="ts"):
     return x[~pd.MultiIndex.from_arrays([x["id"], x[aeg].dt.year * 100 + x[aeg].dt.month]).isin(halb)]
 
 
+RADA_MIN_OSA, RADA_ALLA, RADA_YLE = 0.05, 0.25, 2.5   # raja rike: vt rikkis_suunapaevad
+
+
+def rikkis_suunapaevad(m):
+    """Suuna päevad (site, paev), kus mõni rada on rikkis. m = raja veerandtunnid (site, kanal, ts, v), ainult
+    veerandtunnid, kus kõik suuna rajad on olemas. Raja osa = raja päeva summa / suuna päeva summa; tavaline osa = raja
+    osade mediaan üle kõigi päevade. Rike: osa on alla RADA_ALLA (1/4) tavalisest (ainult rajad, mille tavaline osa on
+    >= RADA_MIN_OSA, 5%), üle RADA_YLE (2,5) korra tavalisest ja vähemalt 5 protsendipunkti suurem, või on kogu suuna
+    päev 0. Nt Loo (0cfcf) 07.2025-06.2026: rajad 1, 4 ja 6 loendavad ~0, rada 3 kohati 10x tavalisest, suuna ööpäev
+    poole väiksem; Lehmja (26d75) 07-08.2025 Tallinna suuna rada 3 = 0. Kohalik tase (nt 41 libisev mediaan) sellist
+    kuudepikkust riket ei näe. Üherajalise suuna rike (v.a 0) siit ei selgu."""
+    paev = m["ts"].dt.normalize().rename("paev")
+    r = m.groupby([m["site"], m["kanal"], paev])["v"].sum()
+    s = r.groupby(level=["site", "paev"]).transform("sum")
+    osa = r / s.where(s > 0)
+    tav = osa.groupby(level=["site", "kanal"]).transform("median")
+    halb = (s == 0) | ((tav >= RADA_MIN_OSA) & (osa < RADA_ALLA * tav)) | ((osa > RADA_YLE * tav) & (osa - tav > 0.05))
+    h = halb.groupby(level=["site", "paev"]).any()
+    return h[h].index
+
+
+_t = pd.DataFrame({"site": "x", "kanal": [1, 2, 1, 2, 1, 2, 1, 2], "v": [50, 50, 60, 40, 2, 50, 0, 0],
+                   "ts": pd.to_datetime(["2025-01-01", "2025-01-01", "2025-01-02", "2025-01-02", "2025-01-03",
+                                         "2025-01-03", "2025-01-04", "2025-01-04"])})
+assert rikkis_suunapaevad(_t).get_level_values("paev").strftime("%d").tolist() == ["03", "04"]
+
+
 def maantee_suunad(algus):
     """Maanteeloendurite suunad ja nende 15 min loendused alates kuupäevast `algus` (13, 20).
     Suund (site) = loendur + raja nime otspunktid (highway.counter_channel, nt '3: Tartu - Tallinn 1' -> 'tartu - tallinn');
     suuna rajad liidetakse ja alles jäävad veerandtunnid, kus kõik suuna rajad on olemas. Kahtlase mahuga loendur-kuud
-    on väljas (ilma_vigaste_kuudeta). Tagastab (ds, dq):
+    on väljas (ilma_vigaste_kuudeta), samuti suuna päevad, kus mõni rada on rikkis (rikkis_suunapaevad; raja tavaline
+    osa kogu andmeperioodist, mitte ainult alates `algus`, et mitmekuune rike ei saaks ise tavaliseks). Tagastab (ds, dq):
       ds  site -> id, lahte, siht, nimi, tee_nr, tee_km, lat, lon
       dq  site, start (veerandtunni algus), c (sõidukeid), n (radu), alla40, ks, kn (vt load_15m), paev, slot (0..95),
           kool (õppetöö), argipaev (tööpäev, ka vaheajal), toopaev (tavaline tööpäev = mõlemad), dow (0 = esmaspäev)"""
@@ -599,8 +635,11 @@ def maantee_suunad(algus):
     loc = load_locations().set_index("id").rename(columns={"latitude": "lat", "longitude": "lon"})
     ds = chn.groupby("site").agg(id=("id", "first"), lahte=("lahte", "first"), siht=("siht", "first"))
     ds = ds.join(loc[["nimi", "tee_nr", "tee_km", "lat", "lon"]], on="id")
-    m = ilma_vigaste_kuudeta(load_15m(), counter_month(load_daily()))
-    m = m[m["ts"] >= algus].merge(chn[["id", "kanal", "site"]], on=["id", "kanal"])
+    m = ilma_vigaste_kuudeta(load_15m(), counter_month(load_daily())).merge(chn[["id", "kanal", "site"]], on=["id", "kanal"])
+    n = m.groupby(["site", "ts"])["v"].transform("size")
+    halb = rikkis_suunapaevad(m[n == n.groupby(m["site"]).transform("max")])     # kogu perioodi järgi
+    m = m[m["ts"] >= algus]
+    m = m[~pd.MultiIndex.from_arrays([m["site"], m["ts"].dt.normalize()]).isin(halb)]
     dq = (m.groupby(["site", "ts"]).agg(c=("v", "sum"), n=("v", "size"), alla40=("alla40", "sum"), ks=("ks", "sum"), kn=("kn", "sum"))
           .reset_index().rename(columns={"ts": "start"}))
     dq = dq[dq["n"] == dq.groupby("site")["n"].transform("max")]          # ainult veerandtunnid, kus kõik suuna rajad on olemas
@@ -842,6 +881,20 @@ def channel_direction():
 
 
 PUHASTUS = {}      # koik (False/True) -> mitu rida loeti ja mitu eemaldati (11_kontrollid näitab)
+KAETUS = {}        # soidukite_kaetus: kontrollimata pordid ja teadmata kaetusega ristmikud (11_kontrollid näitab)
+
+
+def suurim_tagasihype(v):
+    """Eluaegse loenduri (life) suurim langus aja järjekorras sama pordi ja kanali järjestikuste kirjete vahel (0, kui
+    ei lange). Küsitlused tulevad segamini, seega langeb see vahel kuni ~400; loenduri nullimine või hüpe tagasi oleks
+    palju suurem. Kontroll tehakse enne korduvate numbrite eemaldamist, sest pärast seda poleks nullimise järel uuesti
+    tulnud numbreid enam näha."""
+    d = v.sort_values(["port", "kanal", "ts", "life"], kind="stable").groupby(["port", "kanal"])["life"].diff()
+    return float(-min(d.min(), 0)) if d.notna().any() else 0.0
+
+
+assert suurim_tagasihype(pd.DataFrame({"port": 1, "kanal": 1, "ts": range(7),
+                                       "life": [100000, 100001, 120002, 100000, 100001, 120002, 120003]})) == 20002
 
 
 def _soidukid(koik):
@@ -858,21 +911,24 @@ def _soidukid(koik):
     # Sama järjekorranumbri (life) kordus ei ole sõiduk: loenduri arvesti ei liigu, gap = 0 ja väärtused on
     # juhuslikud (30.09.2026: 0,57% ridadest, mõnel loenduril kuni 40%) - ametlik T08 loendus neid ei sisalda.
     # Kiirus 255 = mõõtmata (kood), loetakse kiiruseta sõidukiks (0). Read on päringust aja järjekorras.
-    n0 = len(v)
+    n0, hype = len(v), suurim_tagasihype(v)
     v = v.drop_duplicates(["port", "kanal", "life"])
-    arvud = dict(ridu=n0, korduv_number=n0 - len(v), kiirus_255=int((v["kiirus"] == 255).sum()))
+    arvud = dict(ridu=n0, korduv_number=n0 - len(v), kiirus_255=int((v["kiirus"] == 255).sum()), tagasihype=hype)
     v.loc[v["kiirus"] == 255, "kiirus"] = 0
     v = v.merge(sql("SELECT port, junction_id AS mp_id FROM tallinn.serial_port"), on="port")
     return v[["mp_id", "kanal", "ts", "kiirus", "pikkus", "occ", "gap", "life"]], arvud
 
 
-def soidukite_kaetus(lynk_min=15, elumarke_paevas=1000):
+def soidukite_kaetus(lynk_min=15, elumarke_paevas=1000, kontrollimata_osa=0.01):
     """Sõidukikirjete kaetus ristmiku päeva ja kellatunni kaupa: katmata minutid tunnis (0-60), ristmiku pordide suurim.
     Logija loeb porte eraldi: üks ristmik võib päevast puududa ka siis, kui teised on olemas. Pordi katmata aeg =
-    vahed järjestikuste kirjete vahel üle lynk_min minuti (sh andmete algusest esimese ja viimasest lõpuni) - ainult
-    pordid, mis saadavad elumärke (kiirus, pikkus ja järjekorranumber 0) korrapäraselt (>= elumarke_paevas päevas):
-    nende vaikus tähendab, et porti ei loetud. Harva elumärke saatva pordi (vähese liiklusega) vaikust ei saa rikkest
-    eristada, see kaetust ei vähenda. Tagastab mp_id, paev, tund, katmata_min (kõik ristmikud ja andmeperioodi tunnid)."""
+    vahed järjestikuste kirjete vahel üle lynk_min minuti (sh andmete algusest esimese ja viimasest lõpuni; lühemaid
+    vaikusi ei loeta) - ainult pordid, mis saadavad elumärke (kiirus, pikkus ja järjekorranumber 0) korrapäraselt
+    (>= elumarke_paevas päevas): nende vaikus tähendab, et porti ei loetud. Harva elumärke saatva pordi vaikust ei saa
+    vähesest liiklusest eristada, seega selle kaetus on teadmata. Kui sellised pordid veavad alla kontrollimata_osa
+    (1%) ristmiku sõidukitest (nt MP31 port 78, kõrvaltänav, ~0,3%), jäetakse need kõrvale; kui rohkem või kui ristmikul
+    pole ühtki korrapärast porti, on katmata_min NaN (teadmata, mitte kaetud). Tagastab mp_id, paev, tund, katmata_min
+    (kõik ristmikud ja andmeperioodi tunnid)."""
     tab = ["tallinn.vehicle_passage", "tallinn.serial_port"]
     g = puhver("soidukite_lyngad", tab, sql,
                "WITH r AS (SELECT port, ts, LAG(ts) OVER (PARTITION BY port ORDER BY ts) AS eel FROM tallinn.vehicle_passage) "
@@ -882,24 +938,30 @@ def soidukite_kaetus(lynk_min=15, elumarke_paevas=1000):
                parse_dates=["algus", "lopp"])
     p = puhver("soidukite_pordid", tab, sql,
                "SELECT v.port, s.junction_id AS mp_id, COUNT(*) FILTER (WHERE v.speed_kmh = 0 AND v.length_m = 0 "
-               "AND v.lifetime_counter = 0) AS elumarke, COUNT(DISTINCT v.ts::date) AS paevi FROM tallinn.vehicle_passage v "
+               "AND v.lifetime_counter = 0) AS elumarke, COUNT(*) FILTER (WHERE v.speed_kmh > 0 OR v.length_m > 0 "
+               "OR v.lifetime_counter > 0) AS soidukeid, COUNT(DISTINCT v.ts::date) AS paevi FROM tallinn.vehicle_passage v "
                "JOIN tallinn.serial_port s ON s.port = v.port GROUP BY 1, 2")
+    p["korrapane"] = p["elumarke"] / p["paevi"] >= elumarke_paevas
+    osa = p[~p["korrapane"]].groupby("mp_id")["soidukeid"].sum().reindex(p["mp_id"].unique(), fill_value=0) \
+        / p.groupby("mp_id")["soidukeid"].sum()
+    teadmata = set(osa.index[osa >= kontrollimata_osa]) | set(p["mp_id"]) - set(p.loc[p["korrapane"], "mp_id"])
+    KAETUS["kontrollimata"] = p[~p["korrapane"]].assign(osa_ristmikust=lambda z: z["mp_id"].map(osa))
+    KAETUS["teadmata"] = sorted(teadmata)
     algus = g.loc[g["algus"].isna(), "lopp"].min().floor("D")
     lopp = g.loc[g["lopp"].isna(), "algus"].max().ceil("D")
     g["algus"], g["lopp"] = g["algus"].fillna(algus), g["lopp"].fillna(lopp)
     tunnid = pd.date_range(algus, lopp, freq="h", inclusive="left")
     t0 = tunnid.values.astype("datetime64[s]").astype(float)
     katmata = {}
-    for port in p.loc[p["elumarke"] / p["paevi"] >= elumarke_paevas, "port"]:
+    for port in p.loc[p["korrapane"], "port"]:
         m = np.zeros(len(tunnid))
         for a, b in g.loc[g["port"] == port, ["algus", "lopp"]].itertuples(index=False):
             a, b = pd.Timestamp(a).timestamp(), pd.Timestamp(b).timestamp()   # tunni ja lünga ülekate minutites
             m += np.clip(np.minimum(t0 + 3600, b) - np.maximum(t0, a), 0, None) / 60
         katmata[port] = m
     mp = p.groupby("mp_id")["port"].apply(list)
-    rows = [pd.DataFrame({"mp_id": j, "tunnike": tunnid, "katmata_min": np.max([katmata[q] for q in porte if q in katmata],
-                                                                            axis=0) if any(q in katmata for q in porte)
-                          else 0.0}) for j, porte in mp.items()]
+    rows = [pd.DataFrame({"mp_id": j, "tunnike": tunnid, "katmata_min": np.nan if j in teadmata else
+                          np.max([katmata[q] for q in porte if q in katmata], axis=0)}) for j, porte in mp.items()]
     k = pd.concat(rows, ignore_index=True)
     return k.assign(paev=k["tunnike"].dt.normalize(), tund=k["tunnike"].dt.hour)[["mp_id", "paev", "tund", "katmata_min"]]
 
@@ -910,7 +972,8 @@ SOIDUKID_PAEV = (5, 23)              # sõidukikirjete täispäev: kõik tunnid 
 
 
 def kaetud_tunnid(max_katmata=6):
-    """Ristmiku päeva kellatunnid, kus ükski regulaarne port pole olnud katmata üle max_katmata minuti: mp_id, paev, tund."""
+    """Ristmiku päeva kellatunnid, kus pikad vaikused (üle 15 min, soidukite_kaetus) katavad ühestki korrapärasest
+    pordist kuni max_katmata minutit: mp_id, paev, tund. Teadmata kaetusega (NaN) tund ei ole kaetud."""
     k = soidukite_kaetus()
     return k.loc[k["katmata_min"] <= max_katmata, ["mp_id", "paev", "tund"]]
 
@@ -940,9 +1003,9 @@ def _vehicles_all(koik=False):
     if v.empty:
         return None
     # Kordused eemaldatakse järjekorranumbri (life) järgi; see eeldab, et loendur ei nullu. Aja järjekorras väheneb life
-    # vahel kuni ~400 (küsitlused tulevad segamini), nullimine oleks miljonite suurune hüpe -> peatu.
-    hype = v.sort_values(["mp_id", "kanal", "ts", "life"]).groupby(["mp_id", "kanal"])["life"].diff()
-    assert not (hype < -10_000).any(), "sõidukiloenduri järjekorranumber nullus: kordused life järgi ei kehti enam"
+    # vahel kuni ~400 (küsitlused tulevad segamini), nullimine oleks miljonite suurune hüpe -> peatu. Kontroll on
+    # toorridadel enne korduste eemaldamist (_soidukid, suurim_tagasihype; 06.11.2026 suurim 370).
+    assert PUHASTUS[koik]["tagasihype"] <= 10_000, "sõidukiloenduri järjekorranumber nullus: kordused life järgi ei kehti enam"
     v = v.merge(channel_direction(), on=["mp_id", "kanal"], how="left")
     v[["LSS", "LVS"]] = v[["LSS", "LVS"]].fillna(False).astype(bool)
     return v
@@ -1111,8 +1174,20 @@ def peak_metrics(v, per_hour=4):
     return out
 
 
-def loigud(mask, auk=3):
-    """Järjestikused True-lõigud [(a, b), ...]; kuni `auk` pikkune vahe lõikude vahel loetakse sisse."""
+def piiride_kaupa(loik, n):
+    """Lõigu numbrite (iga punkti kohta) järgi järjestikused osad [(a0, b0), ...]; loik=None -> üks osa [(0, n)]."""
+    if loik is None:
+        return [(0, n)]
+    piir = (np.flatnonzero(np.diff(np.asarray(loik))) + 1).tolist()
+    return list(zip([0] + piir, piir + [n]))
+
+
+def loigud(mask, auk=3, loik=None):
+    """Järjestikused True-lõigud [(a, b), ...]; kuni `auk` pikkune vahe lõikude vahel loetakse sisse. loik = lõigu
+    number iga punkti kohta (09: andmelünk alustab uue lõigu): True-lõik ega vahe sulgemine ei ulatu üle lõigu piiri."""
+    if loik is not None:
+        m = np.asarray(mask, bool)
+        return [(a0 + a, a0 + b) for a0, b0 in piiride_kaupa(loik, len(m)) for a, b in loigud(m[a0:b0], auk)]
     m = np.asarray(mask, bool).copy()
     e = np.flatnonzero(np.diff(np.r_[0, m.astype(int), 0]))
     for a, b in zip(e[1:-1:2], e[2::2]):
@@ -1122,19 +1197,28 @@ def loigud(mask, auk=3):
     return list(zip(e[::2].tolist(), e[1::2].tolist()))
 
 
-def ummiku_loik(mask, lo, hi, auk=3):
-    """Lõik [a, b), mis katab akent [lo, hi) kõige rohkem (võib ulatuda aknast välja); None, kui aknas pole (09, 11)."""
-    kate = [(min(b, hi) - max(a, lo), a, b) for a, b in loigud(mask, auk)]
+def ummiku_loik(mask, lo, hi, auk=3, loik=None):
+    """Lõik [a, b), mis katab akent [lo, hi) kõige rohkem (võib ulatuda aknast välja); None, kui aknas pole (09, 11).
+    loik: nagu loigud (lõik ei ulatu üle andmelünga)."""
+    kate = [(min(b, hi) - max(a, lo), a, b) for a, b in loigud(mask, auk, loik)]
     parim = max(kate, key=lambda x: x[0], default=(0,))
     return parim[1:] if parim[0] > 0 else None
 
 
-def ummikumask(labilase, taistase, algus=0.8, pusib=0.75, auk=2, kiirus=None, kaal=None, v_kesk=None):
+def ummikumask(labilase, taistase, algus=0.8, pusib=0.75, auk=2, kiirus=None, kaal=None, v_kesk=None, loik=None):
     """Ummiku tsüklid fooriga manöövril (09, 11): silutud läbilase on vähemalt algus x täistase. Lühike vajumine -
     kuni `auk` järjestikust andmepunkti, ükski neist alla pusib x täistase -, mille järel läbilase tõuseb tagasi
     tasemeni algus, ei katkesta ummikut; pikem või sügavam vajumine lõpetab selle.
     Kiirustest (ainult kui v_kesk on antud): lõik on ummik ainult siis, kui selle keskmine kiirus (tsüklite kiirus,
-    kaalud `kaal`) on alla manöövri keskmise kiiruse v_kesk."""
+    kaalud `kaal`) on alla manöövri keskmise kiiruse v_kesk. loik: iga lõik (vt loigud) eraldi."""
+    if loik is not None:
+        out = np.zeros(len(labilase), bool)
+        osa = lambda x, a, b: x[a:b] if np.ndim(x) else x
+        for a, b in piiride_kaupa(loik, len(out)):
+            out[a:b] = ummikumask(np.asarray(labilase, float)[a:b], osa(np.asarray(taistase, float), a, b), algus, pusib,
+                                  auk, None if kiirus is None else np.asarray(kiirus, float)[a:b],
+                                  None if kaal is None else np.asarray(kaal, float)[a:b], v_kesk)
+        return out
     r = np.asarray(labilase, float) / taistase
     mask = r >= algus
     l = loigud(mask, 0)
@@ -1148,6 +1232,11 @@ def ummikumask(labilase, taistase, algus=0.8, pusib=0.75, auk=2, kiirus=None, ka
             if not (kaal[a:b].sum() > 0 and np.nansum(kiirus[a:b] * kaal[a:b]) / kaal[a:b].sum() < v_kesk):
                 mask[a:b] = False
     return mask
+
+
+# lõigu piir: vahe sulgemine ega vajumise sildamine ei ulatu üle selle
+assert loigud([1, 1, 0, 1], 1) == [(0, 4)] and loigud([1, 1, 0, 1], 1, loik=[0, 0, 1, 1]) == [(0, 2), (3, 4)]
+assert ummikumask([90, 76, 90], 100).all() and ummikumask([90, 76, 90], 100, loik=[0, 1, 1]).tolist() == [True, False, True]
 
 
 def shift_peak(v, start, share, shift, mode, per_hour=4, pikkus=None):
@@ -1254,17 +1343,23 @@ def tooaeva_profiilid(algus=STS_ALGUS, min_pilu=88):
 
 def tunni_keskmine(M, W=None, per_hour=4):
     """Liikuv tunnikeskmine iga rea kohta: veerg s = pilude s ... s+3 keskmine (W-ga kaalutud); kuju (ridu, 93).
-    Kaaluta pilu (W = 0, nt 0 sõidukit, kus keskmine viivitus on 0/0 = NaN) ei mõjuta keskmist; NaN kaaluga pilus jääb
-    puuduvaks. Ilma selleta läheks NaN x 0 = NaN kumulatiivsesse summasse ja rikuks kõik järgmised tunnid."""
-    W = np.ones_like(M) if W is None else W
-    a = np.cumsum(np.pad(np.where(W > 0, M * W, 0.0), ((0, 0), (1, 0))), axis=1)
-    b = np.cumsum(np.pad(W, ((0, 0), (1, 0))), axis=1)
+    Kaaluta pilu (W = 0, nt 0 sõidukit, kus keskmine viivitus on 0/0 = NaN) ei mõjuta keskmist. Puuduv väärtus
+    kaaluga pilus (või puuduv kaal) teeb puuduvaks ainult need tunnid, mis seda pilu sisaldavad: kumulatiivsetesse
+    summadesse läheb selle asemel 0 ja puuduvate pilude arv loetakse eraldi (muidu rikuks NaN kõik järgmised tunnid)."""
+    M = np.asarray(M, float)
+    W = np.ones_like(M) if W is None else np.asarray(W, float)
+    puudu = np.isnan(W) | ((W > 0) & np.isnan(M))
+    kasuta = ~puudu & (W > 0)
+    cs = lambda x: np.cumsum(np.pad(x, ((0, 0), (1, 0))), axis=1)
+    a, b, c = cs(np.where(kasuta, M * W, 0.0)), cs(np.where(kasuta, W, 0.0)), cs(puudu.astype(float))
+    akn = lambda x: x[:, per_hour:] - x[:, :-per_hour]
     with np.errstate(invalid="ignore", divide="ignore"):          # tühi tund (öösel 0 sõidukit) -> NaN
-        return (a[:, per_hour:] - a[:, :-per_hour]) / (b[:, per_hour:] - b[:, :-per_hour])
+        return np.where(akn(c) > 0, np.nan, akn(a) / akn(b))
 
 
-_M, _W = np.array([[np.nan] + [2.0] * 7]), np.array([[0.0] + [1.0] * 7])
-assert np.allclose(tunni_keskmine(_M, _W)[0, 1:], 2.0) and np.isnan(tunni_keskmine(_M)[0, 0])
+_M, _W = np.array([[np.nan] + [2.0] * 11]), np.array([[0.0] + [1.0] * 11])
+assert np.allclose(tunni_keskmine(_M, _W), 2.0) and np.isnan(tunni_keskmine(_M)[0, 0]) \
+       and np.allclose(tunni_keskmine(_M)[0, 1:], 2.0)                   # puuduv pilu ei riku järgmisi tunde
 
 
 def halvim_tund(M, aken, W=None, per_hour=4):

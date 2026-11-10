@@ -1,5 +1,5 @@
 """
-41 - Sisse- ja väljasõidu bilanss vastassuunaliste paaride kaupa: kas loenduskohas sõidab ööpäevas ühte suunda sama
+41 - Sisse- ja väljasõidu bilanss vastassuunaliste paaride kaupa: kas loenduskohas sõidab päevas ühte suunda sama
 palju kui tagasi, kui arvestada ainult täpselt vastupidiseid manöövreid (A -> B ja B -> A), mida tööle ja koju sõitja
 teeb kumbagi üks kord päevas.
 
@@ -19,21 +19,27 @@ ARVUTUS
     väljapoole tous, %-punktides) näitab, kui selge suund on (väike vahe = mõlemas suunas sarnane päev).
   Päevad: logija nädala tööpäevad (NADAL), ainult ristmiku terved päevad (kõik pordid kaetud 05-23,
     common.tervetel_paevadel).
-  Ristmik on sees, kui vastaspaaride sõidukeid on vähemalt MIN_OSA (75%) tema kõigist sõidukitest; muidu esindaks
-    bilanss ainult väikest osa ristmikust (välja jäävad nt MP07, MP37, MP39, kus paar on 10-30% liiklusest).
+  Kellaajad: kõik bilansid on kell 05-23 (AKEN), mitte keskööst keskööni: sõidukipõhiste kirjete kaetust saab
+    kontrollida ainult 05-23 (common.SOIDUKID_PAEV; öösel vaikivad mõned kontrollerid ka töötades), seega öine liiklus
+    jääb mõlemas suunas välja. Maanteedel sama aken, et kohad oleksid võrreldavad.
+  Ristmik on sees, kui vastaspaaride sõidukeid on vähemalt MIN_OSA (75%) tema kõigist sõidukitest (kell 05-23), pärast
+    seda, kui paarid, mille üks pool on andmetes tühi, on välja jäetud; muidu esindaks bilanss ainult väikest osa
+    ristmikust (välja jäävad nt MP07, MP37, MP39, kus paar on 10-30% liiklusest).
   Bilanss ristmiku päeval = (sisse - välja) / (sisse + välja) x 100, kõigi ristmiku paaride summadest; 0 = mõlemas
     suunas sama palju, +10 = sissepoole 10% paaride liiklusest rohkem kui välja. Ristmiku väärtus = päevade mediaan,
     vahemik = päevade 10. ja 90. protsentiil.
   Maanteeloendurid (MAANTEED, samad nagu 27 ja 32): loenduri kaks suunda on paar (sisse nagu ristmikel); tavalised
-    tööpäevad (E-R, õppetöö, mitte püha) alates ALGUS_MAANTEE, ainult päevad, kus mõlemal suunal on kõik 96
-    veerandtundi ja kummagi suuna ööpäev on RIKE...1/RIKE (pool kuni kaks korda) selle suuna kohalikust tasemest
-    (29 kõrvuti oleva päeva mediaan); muidu ühe suuna rike (nt Peterburi tee 09.2025 ja 05.2026).
-  Koondread (ainult ööpäeva bilansi paneelil): MP kokku = iga päeva kõigi sees olevate ristmike paaride sisse ja
+    tööpäevad (E-R, õppetöö, mitte püha) alates ALGUS_MAANTEE, ainult päevad, kus mõlemal suunal on kõik akna 72
+    veerandtundi ja kummagi suuna päev on üle 0 ning RIKE...1/RIKE (pool kuni kaks korda) selle suuna kohalikust
+    tasemest (29 kõrvuti oleva päeva mediaan, peab olema üle 0); muidu ühe suuna rike. Rikkis rajaga päevad (nt
+    Peterburi tee Loo 07.2025-06.2026, kus kolm rada kuude kaupa ~0) jätab välja juba common.maantee_suunad: nii pikk
+    rike muutuks libisevas mediaanis ise tavaliseks.
+  Koondread (ainult päeva bilansi paneelil): MP kokku = iga päeva kõigi sees olevate ristmike paaride sisse ja
     välja summad (ristmikud, mille see päev on terve); Maanteed kokku = iga päeva kõigi maanteeloendurite summad, kui
     kehtivaid loendureid on sel päeval vähemalt MIN_MAANTEID (5 / 7). Bilanss, mediaan ja protsentiilid nagu kohtadel.
-  Kumulatiivne bilanss kellaaja järgi = iga päeva (sisse - välja) keskööst selle veerandtunni lõpuni / selle päeva
-    (sisse + välja) x 100, mediaan üle päevade (ristmikud kokku: kõigi ristmike paarid päeva kaupa liidetud); ööpäeva
-    lõpus on see ligikaudu ööpäeva bilanss.
+  Kumulatiivne bilanss kellaaja järgi = iga päeva (sisse - välja) kella 05-st selle veerandtunni lõpuni / selle päeva
+    (sisse + välja, 05-23) x 100, mediaan üle päevade (ristmikud kokku: kõigi ristmike paarid päeva kaupa liidetud);
+    kell 23 on see ligikaudu päeva bilanss.
 
 CALCULATION IN PLAIN ENGLISH
   A pair = two movements of one junction where one is the exact reverse of the other (arm A -> arm B and B -> A).
@@ -42,36 +48,38 @@ CALCULATION IN PLAIN ENGLISH
   Inbound side ("sisse") = the trip to work: the side of the pair with the larger (morning 06-10 share of its day's
     vehicles - evening 15-19 share). The same rule at every junction and highway, also in the centre, so "sisse" is
     not always geographically towards the city.
-  Days: logger-week workdays, complete junction-days only. A junction is used only when its pairs carry at least
-    MIN_OSA (75%) of all its vehicles.
+  Days: logger-week workdays, complete junction-days only. Hours: every balance uses 05:00-23:00 only (the hours whose
+    per-vehicle coverage is checked), for junctions and highways alike. A junction is used only when, after dropping
+    pairs with one side empty in the data, its pairs carry at least MIN_OSA (75%) of all its vehicles.
   Balance of a junction-day = (inbound - outbound) / (inbound + outbound) x 100 over all its pairs. Junction value =
     median over days; range = 10th and 90th percentile of days.
   Highway counters: the two directions of one counter are the pair (inbound by the same morning rule); workdays
-    from ALGUS_MAANTEE with all 96 quarter hours in both directions and each direction's day total between RIKE (half)
-    and 1/RIKE (double) of that direction's local level = median of 29 neighbouring days (otherwise a fault).
+    from ALGUS_MAANTEE with all 72 quarter hours of 05-23 in both directions and each direction's day total above 0
+    and between RIKE (half) and 1/RIKE (double) of that direction's local level = median of 29 neighbouring days, which
+    must be above 0 (otherwise a fault). Days with a faulty lane are already removed by common.maantee_suunad.
   Total rows (daily-balance panel only): "MP kokku" = each day's inbound and outbound summed over all included
     junctions complete that day; "Maanteed kokku" = the same over the highway counters, on days with at least
     MIN_MAANTEID (5 of 7) valid counters. Median and percentiles as for single places.
-  Cumulative balance at a clock time = each day's (inbound - outbound) from midnight to the end of that quarter hour /
-    that day's (inbound + outbound) x 100, then the median over days (junctions together: all pairs added per day); at
-    midnight it is about the day's balance.
+  Cumulative balance at a clock time = each day's (inbound - outbound) from 05:00 to the end of that quarter hour /
+    that day's (inbound + outbound, 05-23) x 100, then the median over days (junctions together: all pairs added per
+    day); at 23:00 it is about the day's balance.
 
 VÄLJUND (kaust valjund/)
   41_01_suunabilanss.png
-      Näitab: kas igas loenduskohas liigub ööpäevas sama palju sisse kui välja, kui arvestada ainult täpselt
+      Näitab: kas igas loenduskohas liigub päevas (kell 05-23) sama palju sisse kui välja, kui arvestada ainult täpselt
       vastupidiseid manöövreid (tööle ja tagasi), ja millal päeva jooksul vahe tekib ja tasandub.
       Kuidas: vasakul rida = ristmik, kus paarides on vähemalt 75% liiklusest (sildis kood, nimi, paaride arv ja paaride
       osakaal ristmiku liiklusest; järjestatud bilansi järgi), viimane rida MP kokku; musta joone all maanteeloendurid
       ja Maanteed kokku (koondread rombiga, paksus kirjas; kumulatiivsel paneelil neid ei ole). x-telg = bilanss, %
       ((sisse - välja) / kokku; sisse = hommikul ülekaalus ehk tööle sõidu suund); punkt = päevade mediaan (sinine =
       rohkem sisse, oranž = rohkem välja), hall joon = päevade 10.-90. protsentiil, hallid täpid = üksikud päevad; rea
-      lõpus paaride sõidukid ööpäevas. Paremal kumulatiivne bilanss kellaaja järgi: x = kellaaeg, y = (sisse - välja)
-      keskööst, % ööpäeva paaride liiklusest (mediaanpäev); must katkendjoon = ristmikud kokku, värvilised jooned =
+      lõpus paaride sõidukid päevas (05-23). Paremal kumulatiivne bilanss kellaaja järgi: x = kellaaeg 05-23, y =
+      (sisse - välja) alates kella 05-st, % päeva paaride liiklusest (mediaanpäev); must katkendjoon = ristmikud kokku, värvilised jooned =
       maanteeloendurid (värvid nagu 32); hall joon = 0.
   41_suunabilanss.csv          ristmik / maantee ja koondread: päevi, paare, paaride osakaal liiklusest, sisse ja välja
-                               ööpäevas, bilanss (mediaan, päevade 10. ja 90. protsentiil)
+                               päevas (05-23), bilanss (mediaan, päevade 10. ja 90. protsentiil)
   41_suunabilanss_paarid.csv   iga paar: ristmik, sisse- ja väljamanööver (harud), hommikuse ülekaalu vahe
-                               (%-punkti), sõidukeid ööpäevas, bilanss
+                               (%-punkti), sõidukeid päevas (05-23), bilanss
 """
 import re
 
@@ -80,7 +88,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-from common import (tervetel_paevadel, maantee_suunad, load_vehicles, load_manoeuvres, load_junctions,
+from common import (tervetel_paevadel, SOIDUKID_PAEV, maantee_suunad, load_vehicles, load_manoeuvres, load_junctions,
                     day_calendar, set_style, save, save_table, short_name, TEXT, TEXT2, C_BLUE, C_ORANGE, C_GRAY, C_AQUA,
                     C_YELLOW, C_MAGENTA, C_GREEN, C_VIOLET)
 
@@ -94,7 +102,9 @@ VARVID = [C_BLUE, C_ORANGE, C_AQUA, C_YELLOW, C_MAGENTA, C_GREEN, C_VIOLET]     
 HOMMIK, OHTU = (6, 10), (15, 19)                                                # suuna määramiseks (kellaajad)
 MIN_OSA = 75             # ristmik sees, kui vastaspaarides on vähemalt nii mitu % tema liiklusest (muidu ei esinda ristmikku)
 MIN_MAANTEID = 5         # "Maanteed kokku" päev: vähemalt nii mitu maanteeloendurit (7-st) on sel päeval kehtiv
-RIKE = 0.5               # maanteel päev välja, kui ühe suuna ööpäev on alla poole või üle kahe korra suuna kohalikust tasemest
+AKEN = SOIDUKID_PAEV       # bilansi kellaajad 05-23: sõidukikirjete kaetus on kontrollitud ainult siin; maanteedel sama
+PILUD = range(AKEN[0] * 4, AKEN[1] * 4)   # akna 15 min pilud
+RIKE = 0.5               # maanteel päev välja, kui ühe suuna päev on alla poole või üle kahe korra suuna kohalikust tasemest
 
 
 def vastaspaarid(dm):
@@ -118,9 +128,9 @@ def tous(tund, n):
 
 
 def kumulatiivne(s, v):
-    """Päev x 15 min pilu (sisse s, välja v) -> mediaanpäeva kumulatiivne bilanss igas pilus: iga päeva
-    (sisse - välja) keskööst pilu lõpuni / päeva (sisse + välja) x 100, siis mediaan üle päevade."""
-    s, v = s.reindex(columns=range(96), fill_value=0), v.reindex(columns=range(96), fill_value=0)
+    """Päev x 15 min pilu (sisse s, välja v) -> mediaanpäeva kumulatiivne bilanss igas akna (PILUD) pilus: iga päeva
+    (sisse - välja) akna algusest pilu lõpuni / päeva (sisse + välja, aknas) x 100, siis mediaan üle päevade."""
+    s, v = s.reindex(columns=PILUD, fill_value=0), v.reindex(columns=PILUD, fill_value=0)
     return ((s - v).cumsum(axis=1).div((s + v).sum(axis=1), axis=0) * 100).median()
 
 
@@ -146,7 +156,7 @@ def kokku_rida(s, v, nimi):
 
 _t = vastaspaarid(pd.DataFrame({"mp_id": [1, 1, 1, 2], "a": ["X", "Y", "X", "Y"], "b": ["Y", "X", "Z", "X"]}))
 assert _t.index.tolist() == [0, 1] and _t["paar"].nunique() == 1
-assert kumulatiivne(pd.DataFrame([[3, 1]]), pd.DataFrame([[1, 3]])).tolist()[:2] == [25, 0] and bilanss(60, 40) == 20 and vastassuund("0cfcf | narva - tallinn") == "0cfcf | tallinn - narva"
+assert kumulatiivne(pd.DataFrame([[3, 1]], columns=PILUD[:2]), pd.DataFrame([[1, 3]], columns=PILUD[:2])).tolist()[:2] == [25, 0] and bilanss(60, 40) == 20 and vastassuund("0cfcf | narva - tallinn") == "0cfcf | tallinn - narva"
 assert haru("3 Tammsaare, Tondi side (E)") == "Tammsaare, Tondi pool (E)" and tous([7, 16, 12], [3, 1, 4]) == 0.25
 
 set_style()
@@ -160,15 +170,11 @@ dm = vastaspaarid(dm[dm["a"] != dm["b"]])
 
 v = load_vehicles(None, koik=True)
 v = tervetel_paevadel(v[v["ts"].dt.normalize().isin(NADAL)])
+v = v[v["ts"].dt.hour.between(AKEN[0], AKEN[1] - 1)]                       # ainult kontrollitud kaetusega tunnid
 v = v.assign(paev=v["ts"].dt.normalize(), slot=v["ts"].dt.hour * 4 + v["ts"].dt.minute // 15)
-koik = v.groupby("mp_id").size()                                           # ristmiku kõik sõidukid (terved päevad)
+koik = v.groupby("mp_id").size()                                           # ristmiku kõik sõidukid (terved päevad, 05-23)
 x = v.merge(dm[["mp_id", "channel", "paar", "a", "b"]].rename(columns={"channel": "kanal"}),
             on=["mp_id", "kanal"])
-osa = x.groupby("mp_id").size() / koik.reindex(x["mp_id"].unique()) * 100      # paaride osakaal ristmiku liiklusest
-valja_jaetud = osa[osa < MIN_OSA].sort_values()
-print(f"Välja (paarides alla {MIN_OSA}% ristmiku liiklusest): "
-      + ", ".join(f"{jn.loc[m, 'code']} {o:.0f}%" for m, o in valja_jaetud.items()))
-x = x[~x["mp_id"].isin(valja_jaetud.index)].copy()
 x["h"] = x["ts"].dt.hour
 
 # paari pooled: hommikune ülekaal -> kumb pool on sisse (tööle sõidu suund)
@@ -179,7 +185,13 @@ for (mp, paar), g in pool.groupby(["mp_id", "paar"]):
         continue
     g = g.sort_values("tous", ascending=False)
     sisse[(mp, paar)] = (g["a"].iloc[0], (g["tous"].iloc[0] - g["tous"].iloc[1]) * 100)
-x = x[[(m, p) in sisse for m, p in zip(x["mp_id"], x["paar"])]].copy()
+x = x[[(m, p) in sisse for m, p in zip(x["mp_id"], x["paar"])]].copy()      # paarid, mille mõlemal poolel on sõidukeid
+# paaride osakaal ristmiku liiklusest alles pärast poolteta paaride eemaldamist (muidu võiks jääda alla MIN_OSA)
+osa = x.groupby("mp_id").size() / koik.reindex(x["mp_id"].unique()) * 100
+valja_jaetud = osa[osa < MIN_OSA].sort_values()
+print(f"Välja (paarides alla {MIN_OSA}% ristmiku liiklusest): "
+      + ", ".join(f"{jn.loc[m, 'code']} {o:.0f}%" for m, o in valja_jaetud.items()))
+x = x[~x["mp_id"].isin(valja_jaetud.index)].copy()
 x["sisse"] = [sisse[(m, p)][0] == a for m, p, a in zip(x["mp_id"], x["paar"], x["a"])]
 
 paevad = x.groupby(["mp_id", "paev"])["sisse"].agg(sisse="sum", kokku="size")
@@ -214,8 +226,9 @@ for nimi, s in MAANTEED:
     a = dq[dq["site"] == s].set_index(["paev", "slot"])["c"]
     b = dq[dq["site"] == vastassuund(s)].set_index(["paev", "slot"])["c"]
     yhine = a.index.intersection(b.index)
+    yhine = yhine[yhine.get_level_values(1).isin(PILUD)]
     terve = yhine.get_level_values(0).value_counts()
-    yhine = yhine[yhine.get_level_values(0).isin(terve.index[terve == 96])]
+    yhine = yhine[yhine.get_level_values(0).isin(terve.index[terve == len(PILUD)])]           # kõik akna veerandtunnid
     if yhine.get_level_values(0).nunique() < 20:
         print(f"  {nimi}: mõlema suuna terveid päevi alla 20, välja")
         continue
@@ -225,7 +238,8 @@ for nimi, s in MAANTEED:
         print(f"  {nimi}: hommikul ülekaalus on linnast välja suund, see on sisse")
     pa, pb = a.groupby("paev").sum(), b.groupby("paev").sum()
     ma, mb = (z.rolling(29, center=True, min_periods=10).median() for z in (pa, pb))     # suuna kohalik tase
-    ok = pa.between(RIKE * ma, ma / RIKE) & pb.between(RIKE * mb, mb / RIKE)      # ühe suuna rike: päev välja
+    ok = (pa.between(RIKE * ma, ma / RIKE) & pb.between(RIKE * mb, mb / RIKE)     # ühe suuna rike: päev välja; pikk
+          & (pa > 0) & (pb > 0) & (ma > 0) & (mb > 0))                           # nullide jada oleks muidu ise tase
     a, b, pa, pb = a[a.index.get_level_values(0).isin(ok.index[ok])], b[b.index.get_level_values(0).isin(ok.index[ok])], pa[ok], pb[ok]
     bp = bilanss(pa, pb)
     m_rows.append(dict(tyyp="maantee", kood="", nimi=nimi, paevi=len(bp), paare=1, osakaal_pct=np.nan,
@@ -254,7 +268,7 @@ ps = x.groupby(["paev", "slot", "sisse"]).size().unstack("sisse", fill_value=0)
 kum_linn = kumulatiivne(ps[True].unstack("slot"), ps[False].unstack("slot"))
 linn_bil = bilanss(ps[True].sum(), ps[False].sum())
 print(f"Ristmikke {len(r)}, paare {len(paarid)}; ristmikud kokku bilanss {linn_bil:+.1f}% (ristmike keskmiste summa: sisse "
-      f"{r['sisse_paevas'].sum():,.0f}, välja {r['valja_paevas'].sum():,.0f} sõidukit ööpäevas)")
+      f"{r['sisse_paevas'].sum():,.0f}, välja {r['valja_paevas'].sum():,.0f} sõidukit päevas kell 05-23)")
 print(f"Ristmikke, kus |bilanss| < 5%: {(r['bilanss'].abs() < 5).sum()} / {len(r)}; suurimad: "
       + ", ".join(f"{k} {b:+.0f}%" for k, b in r.set_index("kood")["bilanss"].sort_values(key=abs).tail(5)[::-1].items()))
 for m in [k_rist, k_mt]:
@@ -301,20 +315,20 @@ a1.legend(handles=[Line2D([], [], marker="o", ls="", color=C_BLUE, label="mediaa
                    Line2D([], [], marker="D", ls="", color=C_GRAY, markeredgecolor=TEXT,
                           label="kokku: kõigi kohtade paarid päeva kaupa liidetud")],
           loc="upper left", fontsize=8)
-a1.set_title(f"Vastaspaaride ööpäeva bilanss (ristmikud: tööpäevad {NADAL[0]:%d.%m}-{NADAL[-1]:%d.%m.%Y};\n"
+a1.set_title(f"Vastaspaaride päeva bilanss kell 05-23 (ristmikud: tööpäevad {NADAL[0]:%d.%m}-{NADAL[-1]:%d.%m.%Y};\n"
              f"maanteed: tööpäevad alates {pd.Timestamp(ALGUS_MAANTEE):%d.%m.%Y})", fontsize=10)
-a1.text(1.01, 1.0, "sõidukit\nööpäevas", transform=a1.transAxes, fontsize=7, color=TEXT2, va="bottom")
+a1.text(1.01, 1.0, "sõidukit\n05-23", transform=a1.transAxes, fontsize=7, color=TEXT2, va="bottom")
 
-xh = (np.arange(96) + 1) / 4
+xh = (np.array(PILUD) + 1) / 4
 a2.axhline(0, color=TEXT2, lw=1)
 for (nimi, _), c in zip(MAANTEED, VARVID):
     if nimi in m_kum:
-        a2.plot(xh, m_kum[nimi].reindex(range(96)).values, color=c, lw=1.6, label=nimi)
+        a2.plot(xh, m_kum[nimi].reindex(PILUD).values, color=c, lw=1.6, label=nimi)
 a2.plot(xh, kum_linn.values, color=TEXT, lw=2.2, ls="--", label=f"linna ristmikud kokku ({len(r)}; {len(paarid)} paari)")
-a2.set_xlim(0, 24)
-a2.set_xticks(range(0, 25, 2), [f"{h:02d}" for h in range(0, 25, 2)])
+a2.set_xlim(*AKEN)
+a2.set_xticks(range(AKEN[0], AKEN[1] + 1, 2), [f"{h:02d}" for h in range(AKEN[0], AKEN[1] + 1, 2)])
 a2.set_xlabel("kellaaeg")
-a2.set_ylabel("(sisse - välja) keskööst, % ööpäeva paaride liiklusest")
+a2.set_ylabel("(sisse - välja) alates kella 05-st, % päeva (05-23) paaride liiklusest")
 a2.set_title("Kumulatiivne bilanss: hommikul koguneb sissepoole, õhtul tasandub", fontsize=10)
 a2.legend(loc="lower left", fontsize=8)
 fig.suptitle("Sisse- ja väljasõidu tasakaal: ainult täpselt vastupidised manöövrid (tööle ja tagasi)", x=0.01, ha="left",

@@ -44,8 +44,9 @@ VÄLJUND (kaust valjund/)
       Näitab: kui palju ooteaega juht nihkudes säästab ja kui palju see maksab ajakaotusena; kus need jooned ristuvad.
       Kuidas: 2 x 4 paneeli; rida = hommik, õhtu; veerg = koridor. x = nihe, min; y = minutid (logaritmiline skaala,
       et sääst ja hind mahuksid samale teljele; iga jaotis = 10 korda rohkem). Pidev joon = säästetud
-      ooteaeg (sinine = varem, oranž = hiljem), katkendjoon = ajakaotuse hind (sinine = varem, BETA x Δ; oranž =
-      hiljem, GAMMA x Δ). Tekstis suurim sääst ja suurim tasuv nihe.
+      ooteaeg (sinine = varem, oranž = hiljem), katkendjoon = ajakaotuse hind saabumise nihke järgi, samad väärtused
+      mis tabelis (sinine = varem, BETA x (Δ + sääst); oranž = hiljem, GAMMA x (Δ - sääst), kui sääst on suurem kui Δ,
+      siis BETA x (sääst - Δ)). Tekstis suurim sääst ja suurim tasuv nihe.
   40_2_juhi_tasuvus.csv   koridor, tipp: ristmikud, tipuaeg, viivitus tipus (min), suurim sääst varem / hiljem ja selle
                           nihe, suurim tasuv nihe varem / hiljem, vajalik kaal 15, 30 ja 60 min nihke juures, mitu
                           sama suurt ristmikku peaks teel olema, et 15 min nihe tasuks
@@ -94,7 +95,7 @@ for nimi, mps in KORIDORID.items():
         # (kui sääst on suurem kui Δ, saabub ta ikkagi varem kui soovitud -> varajase saabumise kulu)
         h_e = BETA * (dlt + s_e)
         h_l = np.where(dlt - s_l >= 0, GAMMA * (dlt - s_l), BETA * (s_l - dlt))
-        kõverad[(nimi, tipp)] = (s_e, s_l, t, dk[t], len(mps))
+        kõverad[(nimi, tipp)] = (s_e, s_l, h_e, h_l, t, len(mps))                # joonis kasutab samu hindu
         r = dict(koridor=nimi, tipp=tipp, ristmikud=" ".join(a["pa"].loc[m, "kood"] for m in mps), ristmikke=len(mps),
                  tipuaeg=hhmm(t / 60), viivitus_tipus_min=dk[t], viivitus_min_paeval_min=dk[6 * 60:20 * 60].min(),
                  saast_varem_max_min=s_e.max(), saast_varem_nihe=int(dlt[np.argmax(s_e)]),
@@ -115,14 +116,15 @@ fig, axes = plt.subplots(2, len(KORIDORID), figsize=(17, 8.5), sharex=True)
 for j, nimi in enumerate(KORIDORID):
     for i, tipp in enumerate(AKNAD):
         ax = axes[i, j]
-        s_e, s_l, t, d0, n = kõverad[(nimi, tipp)]
+        s_e, s_l, h_e, h_l, t, n = kõverad[(nimi, tipp)]
         r = k[(k["koridor"] == nimi) & (k["tipp"] == tipp)].iloc[0]
         pos = lambda x: np.where(x > 0, x, np.nan)                         # logaritmteljel ainult > 0
         ax.plot(dlt, pos(s_e), color=C_BLUE, lw=2.4, label="sääst: varem")
         ax.plot(dlt, pos(s_l), color=C_ORANGE, lw=2.4, label="sääst: hiljem")
-        ax.plot(dlt, BETA * dlt, color=C_BLUE, ls="--", lw=1.5, label=f"hind: varem ({BETA:.2f} x nihe)".replace(".", ","))
-        ax.plot(dlt, GAMMA * dlt, color=C_ORANGE, ls="--", lw=1.5,
-                label=f"hind: hiljem ({GAMMA:.2f} x nihe)".replace(".", ","))
+        ax.plot(dlt, pos(h_e), color=C_BLUE, ls="--", lw=1.5,
+                label=f"hind: varem ({BETA:.2f} x (nihe + sääst))".replace(".", ","))
+        ax.plot(dlt, pos(h_l), color=C_ORANGE, ls="--", lw=1.5,
+                label=f"hind: hiljem ({GAMMA:.2f} x (nihe - sääst))".replace(".", ","))
         ax.set_yscale("log")
         ax.set_ylim(0.01, 400)
         ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v:g}".replace(".", ",")))

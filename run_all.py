@@ -33,6 +33,9 @@ JÄRJEKORD
                      34 tabelit)
   41                 sisse- ja väljasõidu bilanss ainult täpselt vastupidiste manöövrite paaridest (tööle ja tagasi),
                      ristmikud ja maanteed
+  42                 hooajad: tööpäeva liiklus talvel, kevadel, suvel ja sügisel ristmikel ja Tallinna lähedastel
+                     maanteedel (võrdluseks „Tallinn 2035“ küsitluse talve ja kevade-suve-sügise küsimustega) ning
+                     hooaja aastakasv (maanteed tunniloendustest 2019-...)
   07_2, 06_2         07 ja 06 teine versioon: muutuva pikkusega tipuaeg (sama aeglane või sama tihe kui tavalises
                      tipus); 07_2 kasutab 07 tabeleid, 06_2 07 ja 07_2 tabeleid; mõlemad mudelit A (09, 27, 33)
   07 ja 06 uuesti    suunaanalüüs: SUUND=LSS (linna sisse) ja LVS (linnast välja), kumbki 5 min ja 15 min sammuga
@@ -82,6 +85,7 @@ SCRIPTS = ["01_kvaliteet.py", "02_riik.py", "03_maakond.py", "04_tee.py", "05_ku
            "26_ajanihe_tundlikkus.py",
            "27_labilaskevoime.py", "28_koridorid.py",                         # 27 ja 28 kasutavad 24, 28 ka 27 tabelit
            "29_kalender.py", "30_aastavordlus.py", "31_tipu_naitajad.py", "32_suunad_tunniti.py", "41_suunabilanss.py",
+           "42_hooajad.py",
            "33_kullastusvoog_eeldus.py",                                       # 33 kasutab 10, 24 ja 27 tabelit
            "34_profiilituubid.py", "35_tipu_hajumine.py",
            "36_lagundus.py",                                                   # 36 kasutab 29 tabelit

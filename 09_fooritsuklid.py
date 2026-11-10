@@ -25,9 +25,10 @@ ARVUTUS
   3) "vaba" - vaba vool (Laagna tee, viaduktid, vabad parempöörded jm): 60 s aknad.
   Andmed: ainult ristmiku terved päevad (kõik pordid kaetud 05-23, common.tervetel_paevadel).
   Ummik fooriga manöövril (kindel, paus; common.ummikumask). Läbilase = sõidukit tunnis (n x 3600 / T, võrreldav ka
-     foorikava vahetumisel), silutud 5 tsükli liikuva mediaaniga. Silumine ja ummik ei ulatu üle augu: eemaldatud
-     tsükkel või andmelünk üle 60 s alustab uue lõigu. Täistase = selle tipuakna (hommik 06-11, õhtu 14-20)
-     suurim väärtus (päevade mediaan). Ummik = silutud läbilase on vähemalt 80% täistasemest. Lühike vajumine - kuni 2
+     foorikava vahetumisel), silutud 5 tsükli liikuva mediaaniga. Silumine, ummik ja seisak ei ulatu üle augu: kui
+     eelmise tsükli lõpust järgmise alguseni on üle 60 s (puuduv 30 min plokk, eemaldatud pikk tsükkel), algab uus
+     lõik (veerg loik); lühem vahe (nt eemaldatud lühike üleminekutsükkel) lõiku ei katkesta. Täistase = selle
+     tipuakna (hommik 06-11, õhtu 14-20) suurim väärtus (päevade mediaan). Ummik = silutud läbilase on vähemalt 80% täistasemest. Lühike vajumine - kuni 2
      järjestikust andmepunkti (tsüklit), mitte alla 75% täistasemest -, mille järel läbilase tõuseb tagasi 80% peale,
      ei katkesta ummikut; pikem või sügavam vajumine lõpetab selle (liiklus on rahunenud). Tipuakna ummik = lõik, mis
      katab akent kõige rohkem (võib ulatuda aknast välja); lahenemine = esimene tsükkel pärast seda.
@@ -66,7 +67,8 @@ CALCULATION IN PLAIN ENGLISH
     with the most uneven folded pattern is the fixed signal cycle. Adaptive signals: a cycle runs from one red pause (a
     gap of at least 8 s on all lanes) to the next. Free-flow lanes: 60-second windows.
   Throughput = vehicles in the cycle x 3600 / cycle length (vehicles per hour), smoothed by the median of 5 cycles in a
-    row; a removed cycle or a data gap over 60 s starts a new stretch, and smoothing never crosses it.
+    row; more than 60 s between the end of one cycle and the start of the next starts a new stretch, and neither the
+    smoothing nor a congestion or stoppage episode crosses it (a shorter gap, e.g. a removed short cycle, does not).
   Full level = the largest smoothed throughput in the peak window (morning 06-11, evening 14-20), median over days.
   Congestion (signal) = smoothed throughput >= 80% of full level; a dip of up to 2 cycles that stays at or above 75%
     does not end it. Free flow: congestion = smoothed speed <= 70% of free speed (85th percentile of smoothed speed).
@@ -108,8 +110,8 @@ VÄLJUND (kaust valjund/)
       sõiduki kohta (s/km). x-telg = 15 min aknad: 45-60 ... 0-15 min enne ummiku algust | 0-15 ... 45-60 min pärast
       lahenemist; hall püstriba = ummik. Punkt = stabiilsete tööpäeva-ummikute mediaan, vurrud = kvartiilid; sinine =
       hommik, oranž = õhtu, hall = terve päeva ummik.
-  09_tsuklid.csv            iga tsükkel või aken: algus, pikkus T, sõidukeid n, kiirus, täistase, kas ummikus, hõivatus,
-                            kas seisak
+  09_tsuklid.csv            iga tsükkel või aken: algus, pikkus T, lõigu number loik (päeva sees; uus lõik pärast üle 60 s
+                            auku), sõidukeid n, kiirus, täistase, kas ummikus, hõivatus, kas seisak
   09_manoovrid.csv          manöövri meetod, selguse näitajad, keskmine ja vaba kiirus, radade arv, tippude mediaanid,
                             seisakupäevade arv ja seisakuminutid tööpäeva kohta (tipuaegadel)
   09_seisakud.csv           iga seisakulõik: algus, lõpp, kestus, läbilase % täistasemest, hõivatus ja täistaseme
@@ -364,22 +366,22 @@ c = c.join(tais, on=VOTI + ["tyyp", "pool"])
 c["seisak"] = seisakumask(c["sile"], c["taistase"], c["hoivatus_sile"], c["hoivatus_tais"])
 save_table(c.assign(algus=(c["paev"] + pd.to_timedelta(c["t"].round(), unit="s")).dt.strftime("%Y-%m-%d %H:%M:%S"),
                     mp="MP" + c["mp_id"].astype(str).str.zfill(2), t=np.floor(c["t"] * 1000) / 1000)
-           [["mp", "direction_id", "meetod", "algus", "t", "T", "n", "ks", "kn", "kiirus", "taistase", "ummikus", "hoivatus",
-             "seisak"]]
+           [["mp", "direction_id", "meetod", "algus", "t", "T", "loik", "n", "ks", "kn", "kiirus", "taistase", "ummikus",
+             "hoivatus", "seisak"]]
            .round({"T": 1, "ks": 1, "kiirus": 1, "taistase": 1, "hoivatus": 3}), "09_tsuklid")
 
 hms = lambda t: slot_label(t / 60, 60)
 ummikud, umber, seisakud = [], [], []
 for (mp, did, paev), d in c.groupby(VOTI + ["paev"]):
-    t, T, n, q, qs, vs, ks, kn = (d[x].values for x in ["t", "T", "n", "q", "sile", "kiirus_sile", "ks", "kn"])
+    t, T, n, q, qs, vs, ks, kn, lk = (d[x].values for x in ["t", "T", "n", "q", "sile", "kiirus_sile", "ks", "kn", "loik"])
     meetod, tyyp, leitud = d["meetod"].iloc[0], d["tyyp"].iloc[0], {}    # lõik -> [(tipp, täistase)]
     for tipp, (a, b) in TIPUD.items():
         key = (mp, did, tyyp, tipp)
-        if key + (paev,) in aken.index:
+        if key + (paev,) in aken.index:                                 # ummik ei ulatu üle augu (loik), nagu ummikus
             mask = (vs <= VABA_KIIRUS * man.at[(mp, did), "vaba_kiirus"] if meetod == "vaba" else
                     ummikumask(qs, tase[key], ALGUS, PUSIB, VAJUMINE, ks / np.where(kn > 0, kn, np.nan), kn,
-                               man.at[(mp, did), "kiirus_keskmine"] if KIIRUSTEST else None))
-            loik = ummiku_loik(mask, *np.searchsorted(t, [a * 3600, b * 3600]), AUK if meetod == "vaba" else 0)
+                               man.at[(mp, did), "kiirus_keskmine"] if KIIRUSTEST else None, loik=lk))
+            loik = ummiku_loik(mask, *np.searchsorted(t, [a * 3600, b * 3600]), AUK if meetod == "vaba" else 0, loik=lk)
             if loik:
                 leitud.setdefault(loik, []).append((tipp, tase[key]))
     for (i0, i1), tipud in leitud.items():     # sama lõik mõlemas tipus = üks terve päeva ummik ("hommik+õhtu")
@@ -411,8 +413,8 @@ for (mp, did, paev), d in c.groupby(VOTI + ["paev"]):
     # seisakulõigud (kuni VAJUMINE tsükli pikkune vahe loetakse sisse; arvesse alates MIN_KESTUS minutist) ja neid
     # ümbritsev koormatud aeg = ummik ja seisak kokku
     sk, hs = d["seisak"].values, d["hoivatus_sile"].values
-    koormus = loigud(sk | d["ummikus"].values, VAJUMINE)
-    for i0, i1 in loigud(sk, VAJUMINE):
+    koormus = loigud(sk | d["ummikus"].values, VAJUMINE, lk)
+    for i0, i1 in loigud(sk, VAJUMINE, lk):
         t0, t1 = t[i0], t[i1 - 1] + T[i1 - 1]
         if t1 - t0 < MIN_KESTUS * 60:
             continue

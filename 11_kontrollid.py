@@ -18,7 +18,7 @@ KONTROLLID: ARVUTUS JA VÄLJUND (kaust valjund/)
   3) Usutavus: kiirus 0 või üle 120 km/h, pikkus 0 või üle 25 m (% ristmiku sõidukitest).  -> 11_usutavus.csv
   4) Künnise tundlikkus: kui palju nihkub ummiku algus ja lahenemine, kui ummiku lävi on 75% või 85% täistasemest
      (mitte 80%; lubatud lühikese vajumise põhi on alati 5 protsendipunkti madalam). Kindla tsükliga stabiilsed
-     ummikud.                                                                  -> 11_tundlikkus.csv
+     ummikud; silumine ja ummik nagu 09 lõigu (09_tsuklid veerg loik) sees.  -> 11_tundlikkus.csv
   5) Olulisus: LSS ja LVS tipu alguse erinevus samal ristmikul (Wilcoxoni märgiastaktest) ning ummiku ümber kiiruse
      võidu mediaani 95% usaldusvahemik (bootstrap, common.mediaani_uv).       -> 11_olulisus.csv
   6) Ühe päeva jaotuste püsivus (vajab >= 2 tervet tööpäeva): 5 min osakaalude ja LSS/LVS osakaalu standardhälve
@@ -32,7 +32,7 @@ CALCULATION IN PLAIN ENGLISH
      correlation of the two 15-minute profiles.
   3) Plausibility: % of the junction's vehicles with speed 0 or above 120 km/h, length 0 or above 25 m.
   4) Threshold sensitivity: congestion start and end found again with 75% and 85% instead of 80% of full level; shift
-     in minutes.
+     in minutes. Smoothing and congestion stay inside one recording stretch of 09 (column loik).
   5) Significance: Wilcoxon signed-rank test of inbound vs outbound peak start at the same junction; 95% bootstrap
      interval of the median speed gain around congestion (rows resampled independently, so repeated observations of a
      place make the interval rather too narrow).
@@ -44,7 +44,7 @@ import pandas as pd
 from scipy import stats
 
 from common import (tervetel_paevadel, load_vehicles, load_tallinn, five_min_shares, direction_share, ummiku_loik, ummikumask, save_table,
-                    OUT_DIR, PUHASTUS, mediaani_uv)
+                    OUT_DIR, PUHASTUS, KAETUS, mediaani_uv)
 
 TIPUD = {"hommik": (6, 11), "õhtu": (14, 20)}
 loe = lambda nimi, **kw: pd.read_csv(OUT_DIR / f"{nimi}.csv", encoding="utf-8-sig", **kw)
@@ -61,6 +61,10 @@ paevad = sorted(v["paev"].unique())
 print(f"Terveid ristmiku päevi {v.groupby(['mp_id', 'paev']).ngroups}, päevi {len(paevad)} "
       f"({', '.join(pd.Timestamp(p).strftime('%d.%m %a') for p in paevad)}); osalise kaetusega ristmiku päevad välja "
       f"({(n0 - len(v)) / n0 * 100:.1f}% kirjetest)")
+print("Harva elumärke saatvad pordid (vaikust ei saa kontrollida; % ristmiku sõidukitest): "
+      + (", ".join(f"MP{r.mp_id:02d} port {r.port} {r.osa_ristmikust * 100:.2f}%" for r in KAETUS["kontrollimata"].itertuples())
+         or "-")
+      + f"; teadmata kaetusega ristmikud (välja): {', '.join(f'MP{m:02d}' for m in KAETUS['teadmata']) or '-'}")
 
 # --- 1) Terviklikkus loenduri järjekorranumbri järgi ---------------------------------------------------
 v = v.sort_values(["mp_id", "kanal", "life"])
@@ -110,8 +114,8 @@ print(f"\n3) Usutavus: kiirus 0 {(v['kiirus'] == 0).mean() * 100:.2f}%, üle 120
 # --- 4) Künnise tundlikkus ---------------------------------------------------------------------------------
 c = loe("09_tsuklid", parse_dates=["algus"])
 c = c[c["meetod"] == "kindel"].assign(paev=lambda z: z["algus"].dt.normalize())
-c["sile"] = (c["n"] * 3600 / c["T"]).groupby([c["mp"], c["direction_id"], c["paev"]]).transform(
-    lambda s: s.rolling(5, center=True, min_periods=3).median())
+c["sile"] = (c["n"] * 3600 / c["T"]).groupby([c["mp"], c["direction_id"], c["paev"], c["loik"]]).transform(
+    lambda s: s.rolling(5, center=True, min_periods=3).median())         # nagu 09: silumine ega ummik ei ulatu üle augu
 grupid = dict(tuple(c.groupby(["mp", "direction_id", "paev"])))
 um = loe("09_ummikud", parse_dates=["paev"])
 um = um[um["stabiilne"] & (um["meetod"] == "kindel")]
@@ -119,10 +123,10 @@ KUNNISED = (0.75, 0.80, 0.85)                                           # 09: AL
 rows = []
 for r in um.itertuples():
     g = grupid[(r.mp, r.direction_id, r.paev)]
-    tt, T, s = g["t"].values, g["T"].values, g["sile"].values
+    tt, T, s, lk = g["t"].values, g["T"].values, g["sile"].values, g["loik"].values
     lo, hi = np.searchsorted(tt, np.array(TIPUD[r.tipp.split("+")[0]]) * 3600)
     for kunnis in KUNNISED:
-        loik = ummiku_loik(ummikumask(s, r.taistase_soid_h, kunnis, kunnis - 0.05), lo, hi, 0)
+        loik = ummiku_loik(ummikumask(s, r.taistase_soid_h, kunnis, kunnis - 0.05, loik=lk), lo, hi, 0, loik=lk)
         if loik:
             rows.append(dict(ummik=r.Index, kunnis=kunnis, algus=tt[loik[0]] / 60, lahenes=(tt[loik[1] - 1] + T[loik[1] - 1]) / 60))
 tn = pd.DataFrame(rows).pivot(index="ummik", columns="kunnis")
