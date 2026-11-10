@@ -1,7 +1,25 @@
-# Repos on ainult analüüsiskriptid ja andmebaasi skeem (ERD.md). Andmed, väljund, puhvrid ja andmebaasi ühenduse fail jäävad välja.
+# Repo juurkaustas on kolm kausta: Pythoni skriptid (analüüs), Graafikud (joonised) ja Andmebaas (skeem ERD.md).
+# Andmed, tabelid (valjund/), puhvrid, animatsioonide üksikkaadrid, GIF-id ja andmebaasi ühenduse fail jäävad välja.
+# Graafikud (joonised ja videod) lisatakse hiljem: selleks eemalda „# “ allolevate Graafikud-ridade eest.
 *
 !.gitignore
-!common.py
-!run_all.py
-![0-9][0-9]_*.py
-!ERD.md
+!Pythoni skriptid/
+!Pythoni skriptid/common.py
+!Pythoni skriptid/run_all.py
+!Pythoni skriptid/[0-9][0-9]_*.py
+# !Graafikud/
+# !Graafikud/*.png
+# !Graafikud/LSS/
+# !Graafikud/LSS/*.png
+# !Graafikud/LVS/
+# !Graafikud/LVS/*.png
+# !Graafikud/09_04_loendurid/
+# !Graafikud/09_04_loendurid/*.png
+# !Graafikud/24_soojus_ajatelg/
+# !Graafikud/24_soojus_ajatelg/24_02_*.png
+# !Graafikud/24_soojus_ajatelg/*.mp4
+# !Graafikud/25_soojus_paevatyybid/
+# !Graafikud/25_soojus_paevatyybid/25_02_*.png
+# !Graafikud/25_soojus_paevatyybid/*.mp4
+!Andmebaas/
+!Andmebaas/ERD.md
