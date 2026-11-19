@@ -1,6 +1,6 @@
 # Andmebaasi skeem (ERD)
 
-Analüüsiskriptid loevad kõik andmed PostgreSQL-i andmebaasist (`common.py`: `sql`, `tabel`, `puhver`). Andmebaasis on 18 tabelit kolmes skeemis: `highway` (maanteed), `fuel` (kütusemüük) ja `tallinn` (Tallinna ristmikud). Ridade arv ja periood seisuga 06.11.2026.
+Analüüsiskriptid loevad kõik andmed PostgreSQL-i andmebaasist (`common.py`: `sql`, `tabel`, `puhver`). Andmebaasis on 19 tabelit kolmes skeemis: `highway` (maanteed), `fuel` (kütusemüük) ja `tallinn` (Tallinna ristmikud). Ridade arv ja periood seisuga 16.11.2026.
 
 Diagrammis on skeem ja tabel ühendatud alakriipsuga (`highway_counter` = `highway.counter`). Pidev joon on andmebaasi välisvõti; katkendjoon on loogiline seos, mida kasutab analüüsikood, või sobitus nime või numbri järgi (silt algab sõnaga „sobitus”). Vahemikuveerud (nt `cls_1` … `cls_10`) on näidatud esimese veeruna.
 
@@ -62,6 +62,13 @@ erDiagram
         timestamp ts
         integer cls_1 "kuni cls_10: 10 veergu"
         numeric spd_lt40 "kuni spd_ge130: 11 veergu"
+    }
+    highway_count_hourly_rejected {
+        text counter_id FK "loogiline võti, piirangut pole"
+        smallint channel FK "loogiline võti, piirangut pole"
+        timestamp ts
+        integer cls_1 "kuni cls_10: 10 veergu"
+        integer spd_lt40 "kuni spd_ge130: 11 veergu"
     }
     fuel_petrol_county_monthly {
         smallint year
@@ -144,9 +151,9 @@ erDiagram
     highway_counter ||--o{ highway_counter_channel : "counter_id"
     highway_counter_channel ||..o{ highway_count_hourly : "counter_id, channel"
     highway_counter_channel ||..o{ highway_count_15min : "counter_id, channel"
+    highway_counter_channel ||..o{ highway_count_hourly_rejected : "counter_id, channel"
     highway_counter ||..|| highway_counter_raw : "counter_id"
     highway_datex_site ||..o{ highway_datex_flow_15min : "site_id"
-    highway_datex_site |o..o| highway_counter : "sobitus name ja kaugus alla 500 m"
     highway_road_mileage_yearly |o..o{ highway_counter : "sobitus road_no"
     fuel_petrol_county_monthly }o..o{ highway_counter : "sobitus county = veeru nimi"
     fuel_diesel_county_monthly }o..o{ highway_counter : "sobitus county = veeru nimi"
@@ -165,9 +172,10 @@ erDiagram
 | `highway.counter_raw` | loendurijaamade algne loend (koordinaadid parandamata) | 147 |  | – |
 | `highway.road_mileage_yearly` | riigiteede aastane läbisõit, mln sõidukikm (12 põhimaanteed, tugi- ja kõrvalmaanteed kokku) | 14 |  | – |
 | `highway.counter_channel` | loenduri rajad (kanalid) ja nende nimed | 302 |  | counter_id, channel |
-| `highway.datex_site` | DATEX II mõõtekohad | 233 |  | site_id |
-| `highway.datex_flow_15min` | DATEX II 15 min vood ja kiirused | 16 254 | 08.09–01.10.2026 | site_id, ts_end |
+| `highway.datex_site` | DATEX II mõõtekohad (analüüs ei kasuta alates 10.11.2026) | 233 |  | site_id |
+| `highway.datex_flow_15min` | DATEX II 15 min vood ja kiirused (samad loendurid kui `count_15min`; analüüs ei kasuta) | 16 254 | 08.09–01.10.2026 | site_id, ts_end |
 | `highway.count_hourly` | püsiloendurite tunniloendused klasside ja kiirusvahemike kaupa | 15 030 638 | 01.01.2019–31.10.2026 | – |
+| `highway.count_hourly_rejected` | loenduri 077db 2019. aasta vigase laadimise read (ajad segamini), tõstetud välja 06.11.2026; analüüs ei kasuta | 7 216 | 04.01.2019–31.12.2021 | – |
 | `highway.count_15min` | samade loendurite 15 min loendused | 22 465 472 | 01.01.2019–04.10.2026 | – |
 | `fuel.petrol_county_monthly` | bensiinimüük maakonniti, kuu kaupa | 91 | 02.2019–08.2026 | – |
 | `fuel.diesel_county_monthly` | diislimüük maakonniti, kuu kaupa | 91 | 02.2019–08.2026 | year, month |
@@ -177,7 +185,7 @@ erDiagram
 | `tallinn.vehicle_passage` | iga sõiduk eraldi rida (Traffic 24h) | 19 689 418 | 30.09–23.10.2026 | – |
 | `tallinn.serial_port` | kontrolleri port → ristmik | 108 |  | port |
 | `tallinn.junction` | ristmikud MP01…MP50 | 50 |  | junction_id |
-| `tallinn.count_15min` | ristmike 15 min loendused (seire.tallinn.ee T09) | 3 579 072 | 29.07.2024–04.10.2026 | junction_id, ts |
+| `tallinn.count_15min` | ristmike 15 min loendused (seire.tallinn.ee T09) | 3 702 720 | 29.07.2024–01.11.2026 | junction_id, ts |
 | `tallinn.detector_channel` | mida iga ristmiku kanal loendab (manööver) | 462 |  | junction_code, channel |
 
 ## Nimereegel

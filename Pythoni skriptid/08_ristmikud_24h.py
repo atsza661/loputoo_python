@@ -1,5 +1,5 @@
 """
-08 - Ühe ööpäeva sõidukipõhised loendused (Traffic 24h, kolmapäev 30.09.2026): liikluse jaotus loendurite, suundade ja
+08 - Logija nädala tööpäevade sõidukipõhised loendused (Traffic 24h, 16.-22.10.2026): liikluse jaotus loendurite, suundade ja
 ristmike vahel ning 5 min osakaalud 15 min pilu sees. Jooniseid see skript ei tee; 06 ja 07 kasutavad sama 5 min
 jaotust (common.five_min_shares), et arvutada tipu algus ja liikluse keskaeg 5 min täpsusega.
 
@@ -8,21 +8,21 @@ SISEND
   common.load_manoeuvres()   mida iga ristmiku kanal loendab: suund (manööver, T08 "Suund"), lähte- ja sihtharu
 
 ARVUTUS
-  a) Osakaalud: sõidukite arv ööpäevas iga loenduri (kanali) kohta; loenduri osakaal oma suunast ja ristmikust, suuna
+  a) Osakaalud: sõidukite arv ööpäevas (tööpäevade keskmine) iga loenduri (kanali) kohta; loenduri osakaal oma suunast ja ristmikust, suuna
      osakaal ristmikust ja ristmiku osakaal kõigist ristmikest (%).
   b) 5 min osakaalud: iga ristmiku iga 15 min pilu jagatakse kolmeks 5 min osaks (osa_0, osa_1, osa_2 = pilu
-     esimesed, keskmised ja viimased 5 min; summa 100%). Üks päev on mürane, seega saab pilu kõigi ristmike
-     koondjaotuse (veerg linna_jaotus), kui ristmikul on pilus alla 30 sõiduki, mõni 5 min osa on tühi või on >= 150
-     sõiduki juures tühi minut (lühike rike).
+     esimesed, keskmised ja viimased 5 min; summa 100%), tööpäevade sõidukid kokku. Ristmiku päeva pilu jääb välja,
+     kui seal on >= 150 sõiduki juures tühi minut (lühike rike); pilu saab kõigi ristmike koondjaotuse (veerg
+     linna_jaotus), kui ristmikul on pilus kokku alla 30 sõiduki või mõni 5 min osa on tühi.
   Kontrolliks trükitakse, kui palju erineb 5 min jaotus tipptundidel ühtlasest (33,3%).
 
 CALCULATION IN PLAIN ENGLISH
-  a) Shares: vehicles per day on each detector (lane). Lane share of its direction or junction = lane vehicles /
+  a) Shares: vehicles per day (workday average) on each detector (lane). Lane share of its direction or junction = lane vehicles /
      direction (or junction) vehicles x 100; the same for a direction within its junction and a junction among all.
   b) 5-minute shares: each 15-minute slot of each junction is split into three parts, part share = vehicles in those 5
-     minutes / vehicles in the 15 minutes x 100 (the three add up to 100%). When the slot has fewer than 30 vehicles, a
-     part is empty or an empty minute appears at 150+ vehicles (short fault), the combined split of all junctions is
-     used instead.
+     minutes / vehicles in the 15 minutes x 100 (the three add up to 100%), all logger-week workdays together. A
+     junction-day slot with an empty minute at 150+ vehicles (short fault) is left out; when the slot has fewer than 30
+     vehicles in total or a part is empty, the combined split of all junctions is used instead.
   Check: how far the peak-hour 5-minute split is from an even 33.3% each.
 
 VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/)
@@ -31,18 +31,19 @@ VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/)
 """
 import pandas as pd
 
-from common import (load_vehicles, five_min_shares, slot_label, save_table, load_manoeuvres, VEHICLE_DAY)
+from common import (load_vehicles, five_min_shares, slot_label, save_table, load_manoeuvres, LOGIJA_NADAL)
 
 print("Laen sõidukipõhised loendused...")
 v = load_vehicles()
-day = v[v["ts"].dt.normalize() == pd.Timestamp(VEHICLE_DAY)]
-print(f"{VEHICLE_DAY}: {len(day):,} sõidukit, {day['mp_id'].nunique()} ristmikku")
+day = v[v["ts"].dt.normalize().isin(LOGIJA_NADAL)]
+PAEVI = len(LOGIJA_NADAL)
+print(f"{PAEVI} tööpäeva: {len(day):,} sõidukit, {day['mp_id'].nunique()} ristmikku")
 
 # --- a) Osakaalud: loendur, suund, ristmik --------------------------------------------------------
 dm = load_manoeuvres()
 dm = dm.assign(mp_id=dm["mp"].str[2:].astype(int)).rename(columns={"channel": "kanal"})
 cols = ["mp_id", "mp", "intersection", "direction_id", "manoeuvre", "from_leg", "to_leg", "traffic_direction"]
-ch = (day.groupby(["mp_id", "kanal"]).size().rename("soidukeid").reset_index()
+ch = ((day.groupby(["mp_id", "kanal"]).size() / PAEVI).rename("soidukeid").reset_index()
       .merge(dm[cols + ["kanal"]], on=["mp_id", "kanal"], how="left"))
 ch["mp"] = "MP" + ch["mp_id"].astype(str).str.zfill(2)
 ch["intersection"] = ch.groupby("mp_id")["intersection"].transform("first")
@@ -69,7 +70,7 @@ save_table(out[["tase", "mp", "intersection", "direction_id", "manoeuvre", "kana
 sh, fb = five_min_shares(v, flags=True)
 n = day.groupby([day["mp_id"], (day["ts"].dt.hour * 4 + day["ts"].dt.minute // 15).rename("slot")]).size()
 t5 = (sh * 100).round(2).add_prefix("osa_").reset_index()
-t5["soidukeid_15min"] = n.reindex(sh.index, fill_value=0).values
+t5["soidukeid_15min"] = n.reindex(sh.index, fill_value=0).values / PAEVI
 t5["linna_jaotus"] = fb.values
 t5.insert(1, "mp", "MP" + t5["mp_id"].astype(str).str.zfill(2))
 t5.insert(3, "aeg", t5["slot"].map(slot_label))

@@ -49,13 +49,13 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import statsmodels.api as sm
 
-from common import OUT_DIR, set_style, save, save_table, place_labels, C_BLUE, C_RED, C_GRAY, TEXT, TEXT2, GRID
+from common import (OUT_DIR, set_style, save, save_table, place_labels, kalendri_tunnused as tunnused, C_BLUE, C_RED,
+                    C_GRAY, TEXT, TEXT2, GRID)
 
 Z_ERAND = 3.5
 SILTE = 14
 NADALAPAEV = ["E", "T", "K", "N", "R", "L", "P"]
 KUUD = ["jaan", "veebr", "märts", "apr", "mai", "juuni", "juuli", "aug", "sept", "okt", "nov", "dets"]
-SUURED_PYHAD = {"uusaasta", "jõululaupäev", "esimene jõulupüha", "teine jõulupüha", "võidupüha", "jaanipäev"}
 RYHMAD = {"nädalapäev": ["T", "K", "N", "R", "L", "P"], "koolivaheaeg": ["vaheaeg_lühike", "vaheaeg_jõulud", "vaheaeg_suvi"],
           "pühad": ["suur_püha", "muu_püha", "püha_nädalavahetusel", "lühendatud"], "aastaaeg": ["s1", "c1", "s2", "c2"],
           "trend": ["trend"]}
@@ -63,28 +63,6 @@ SILDID = {"T": "teisipäev", "K": "kolmapäev", "N": "neljapäev", "R": "reede",
           "vaheaeg_lühike": "lühike vaheaeg", "vaheaeg_jõulud": "jõuluvaheaeg", "vaheaeg_suvi": "suvevaheaeg",
           "suur_püha": "suur püha tööpäeval", "muu_püha": "muu riigipüha tööpäeval", "püha_nädalavahetusel": "riigipüha L/P", "lühendatud": "lühendatud tööpäev",
           "trend": "trend, % aastas"}
-
-
-def tunnused(x):
-    """Päevade tabel (paev, nadalapaev, paevatyyp, puha, vaheaeg) -> regressiooni tunnuste maatriks (vabaliikmega)."""
-    p = pd.to_datetime(x["paev"])
-    tp = x["nadalapaev"] < 5
-    X = pd.DataFrame(index=x.index)
-    for i, n in enumerate(NADALAPAEV[1:], start=1):
-        X[n] = (x["nadalapaev"] == i).astype(float)
-    for v in ["lühike", "jõulud", "suvi"]:
-        X[f"vaheaeg_{v}"] = ((x["vaheaeg"] == v) & tp & (x["paevatyyp"] != "riigipüha")).astype(float)
-    puha = x["puha"].notna()
-    suur = x["puha"].isin(SUURED_PYHAD)
-    X["suur_püha"] = (suur & tp).astype(float)
-    X["muu_püha"] = (puha & ~suur & tp).astype(float)
-    X["püha_nädalavahetusel"] = (puha & ~tp).astype(float)
-    X["lühendatud"] = (x["paevatyyp"] == "lühendatud").astype(float)
-    a = 2 * np.pi * p.dt.day_of_year / 365.25
-    for k in (1, 2):
-        X[f"s{k}"], X[f"c{k}"] = np.sin(k * a), np.cos(k * a)
-    X["trend"] = (p - p.min()).dt.days / 365.25
-    return sm.add_constant(X)
 
 
 def mojud(fit, nimed):

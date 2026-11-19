@@ -4,7 +4,7 @@ Kas ummik tekib korraga kogu tänaval või ühes kohas ja levib edasi; kumb rist
 koos koormatud.
 
 SISEND
-  common.load_vehicles(None, koik=True)   sõidukipõhised kirjed (tallinn.vehicle_passage), logija nädala
+  common.load_vehicles(None)   sõidukipõhised kirjed (tallinn.vehicle_passage), logija nädala
                                           tööpäevad NADAL: ristmik, kanal, aeg ja loenduril oldud aeg (occ)
   common.channel_direction()              kanali suund: linna sisse (LSS) või linnast välja (LVS) manöövri nime järgi
   valjund/24_soojus_ajatelg/24_kanalid.csv   kanali täistase ja H_täis (24 käib enne)
@@ -15,7 +15,7 @@ SISEND
 ARVUTUS
   Koridor = KORIDORID: ristmikud tänava järjekorras, alates kesklinna (Tammsaare teel Pärnu mnt) otsast; asukoht =
     linnulennuline kaugus naaberristmike vahel kokku liidetuna (km).
-  Koormus nagu 24, aga suuna kaupa: kanali olek 5 min pilus (vaba, tihe, täis, seisak; läved nagu 24), koormusaste =
+  Koormus nagu 24, aga suuna kaupa: kanali olek 5 min pilus (vaba, täis, seisak; common.liiklusolek nagu 24), koormusaste =
     min(q / täistase, 1), seisakus 1; ristmiku suuna koormus = suuna kanalite täistasemega kaalutud keskmine (rikkega
     kanal ei loe; alla poole kaalust = puuduv). Suund = LSS (linna sisse) või LVS (välja) kanali manöövri järgi;
     Tammsaare teel ja Sõpruse pst-l tähendab see sama: kesklinna poole või sealt eemale, kuid ristmiku suunda loevad
@@ -52,9 +52,9 @@ VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/)
   28_01_koridorid_ajaruum.png
       Näitab: kus ja millal on koridor tavalisel tööpäeval koormatud - ummiku ruumiline ja ajaline kuju.
       Kuidas: rida = koridor, veerg = suund (sisse / välja / kõik). Aja-ruumi soojuskaart: x-telg = kellaaeg 06-19, y-telg =
-      ristmik koridori järjekorras (ülal kesklinna ots, sildis kaugus km). Värv = suuna koormus % (6 tööpäeva
+      ristmik koridori järjekorras (ülal kesklinna ots, sildis kaugus km). Värv = suuna koormus % (5 tööpäeva
       keskmine; kollane = vaba, punane = täis; hall = selle suuna kanaleid pole), must joon = koormus KOORMATUD%
-      (15 min silutud), must täpp = keskmiselt >= 5% suuna täistasemest seisab.
+      (15 min silutud), must täpp = mõni suuna rada seisab.
   28_02_paevad_tartu.png, 28_03_paevad_paldiski.png, 28_04_paevad_tammsaare.png, 28_05_paevad_sopruse.png
       Näitab: sama iga tööpäeva kohta eraldi: kas ummiku muster kordub.
       Kuidas: read = suund (sisse, välja, kõik), veerud = tööpäevad; värv nagu eelmisel, must kontuur = koormatud
@@ -73,31 +73,25 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-from common import (paeva_maatriks, OUT_DIR, load_vehicles, channel_direction, load_tallinn, load_junctions, day_calendar, km, loigud,
-                    set_style, save, save_table, TEXT2)
+from common import (LOGIJA_NADAL, paeva_maatriks, OUT_DIR, load_vehicles, channel_direction, load_tallinn, load_junctions, day_calendar, km, loigud,
+                    set_style, save, save_table, liiklusolek, X_LAHEDAL, X_PIIRIL)
 
 KORIDORID = {"Tartu mnt": [34, 35, 39, 19], "Paldiski mnt": [7, 3, 12, 11, 16],
              "Tammsaare tee": [10, 43, 8, 9], "Sõpruse pst": [1, 8]}
 FAIL = {"Tartu mnt": "tartu", "Paldiski mnt": "paldiski", "Tammsaare tee": "tammsaare", "Sõpruse pst": "sopruse"}
-NADAL = pd.to_datetime(["2026-10-16", "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"])
+NADAL = LOGIJA_NADAL
 SAMM = 5
 KELL = (6, 19)
-TAIS, TIHE, SEISAK_H = 0.8, 0.5, 0.10           # olekud nagu 24
 MIN_TAIS, RIKE_MIN = 120, 30                     # nagu 24
-KOORMATUD, KESTUS = 70, 15                       # koormatud: suuna koormus >= 70% vähemalt 15 min
+KOORMATUD = X_LAHEDAL * 100                      # koormatud: suuna koormus >= 85% (HCM 2000 lk 10-46: läbilaskevõime lähedal)
+KESTUS = 15                                      # ... vähemalt HCM-i analüüsiperioodi 15 min (HCM 2000 lk 2-3)
 TIPUD = {"hommik": (6, 11), "õhtu": (14, 19)}
 NIHE = 6                                         # ristkorrelatsiooni nihe kuni 6 pilu (30 min)
-LAE_OSA = 0.95                                   # 15 min: tunnivoog >= 95% vaadeldud piirist
+LAE_OSA = X_PIIRIL                               # tunnivoog >= 95% vaadeldud piirist (HCM 2000 lk 10-46: läbilaskevõimel)
 SUUNAD = {"LSS": "sisse", "LVS": "välja", "koik": "kõik suunad"}
 KOIK = np.arange(0, 24 * 60, SAMM)
 PILUD = KOIK[(KOIK >= KELL[0] * 60) & (KOIK < KELL[1] * 60)]
 CMAP = plt.get_cmap("YlOrRd")
-
-
-def olek(q, h, tais, h_tais):
-    """Liiklusolek 0 vaba, 1 tihe, 2 täis, 3 seisak (nagu 24)."""
-    r = q / tais
-    return np.where((r < TAIS) & (h >= np.maximum(h_tais, SEISAK_H)), 3, np.where(r >= TAIS, 2, np.where(r >= TIHE, 1, 0)))
 
 
 def koormatud_loigud(x):
@@ -113,7 +107,7 @@ def ristkorr(a, b, nihe):
     return np.corrcoef(x[ok], y[ok])[0, 1] if ok.sum() > 30 else np.nan
 
 
-_t = np.r_[np.full(10, 50.0), np.full(4, 80.0), np.full(10, 50.0)]
+_t = np.r_[np.full(10, 50.0), np.full(4, 90.0), np.full(10, 50.0)]
 _s = np.sin(np.arange(40.0))[None, :]
 assert koormatud_loigud(_t) == [(10, 14)] and koormatud_loigud(_t[:12]) == [] and \
        abs(ristkorr(_s, np.roll(_s, 2, axis=1), 2) - 1) < 1e-9          # B = A 2 pilu hiljem -> r = 1 nihkel +2
@@ -128,7 +122,7 @@ for kor, ms in KORIDORID.items():
 
 # --- kanalid 5 min pilud ------------------------------------------------------------------------------------------------
 print("Laen sõidukipõhised kirjed...")
-v = load_vehicles(None, koik=True)
+v = load_vehicles(None)
 v = v[v["ts"].dt.normalize().isin(NADAL) & v["mp_id"].isin(mps)]
 v = v.assign(paev=v["ts"].dt.normalize(), pilu=(v["ts"].dt.hour * 60 + v["ts"].dt.minute) // SAMM * SAMM)
 g = v.groupby(["mp_id", "kanal", "paev", "pilu"])["occ"].agg(["size", "sum"])
@@ -151,8 +145,8 @@ for i, (m, c) in enumerate(kan):
     for a, b in loigud(q[i] == 0, 0):
         if (b - a) * SAMM >= RIKE_MIN and ootus[a:b].any():
             rike[i, a:b] = True
-ol = olek(q, H, T, HT)
-aste = np.where(ol == 3, 1.0, np.minimum(q / T, 1.0))
+ol = liiklusolek(q, H, T, HT)
+aste = np.where(ol == 2, 1.0, np.minimum(q / T, 1.0))
 w = np.where(rike, 0.0, np.broadcast_to(T, q.shape))
 suund = channel_direction().set_index(["mp_id", "kanal"]).reindex(kan)
 print(f"{len(set(kan))} kanalit {len(mps)} ristmikul, rikkepilusid kell 06-19: "
@@ -167,7 +161,7 @@ for sd in SUUNAD:
     kaal = summa(w)
     kaetud = kaal / summa(np.broadcast_to(T, q.shape))
     k = (summa(aste * w) / kaal * 100).mask(kaetud < 0.5)
-    s = (summa((ol == 3) * w) / kaal * 100).mask(kaetud < 0.5)
+    s = (summa((ol == 2) * w) / kaal * 100).mask(kaetud < 0.5)
     nn = pd.DataFrame(n.values[mask], index=idx, columns=KOIK).groupby(["mp_id", "paev"]).sum()
     tab.append(pd.concat({"koormus_pct": k[PILUD].stack(), "seisak_pct": s[PILUD].stack(),
                           "soidukeid": nn[PILUD].stack()}, axis=1).rename_axis(["mp_id", "paev", "pilu"]).reset_index()
@@ -263,7 +257,7 @@ def ajaruum(ax, kor, sd, k, s=None, kontuur=False):
                    pd.DataFrame(np.nan_to_num(z)).T.rolling(3, center=True, min_periods=1).mean().T.values,   # 15 min
                    levels=[KOORMATUD], colors="black", linewidths=0.9)
     if s is not None:
-        yy, xx = np.nonzero(np.nan_to_num(s.reindex(index=ms, columns=PILUD).values) >= 5)
+        yy, xx = np.nonzero(np.nan_to_num(s.reindex(index=ms, columns=PILUD).values) > 0)
         ax.scatter(KELL[0] + (xx + 0.5) * SAMM / 60, yy, s=4, color="black", lw=0)
     ax.set_yticks(range(len(ms)), [f"{jn.loc[m, 'code']} {asukoht[kor][m]:.1f} km" for m in ms], fontsize=8)
     ax.set_xticks(range(KELL[0], KELL[1] + 1, 2))
@@ -284,8 +278,8 @@ for ax in axes[-1]:
     ax.set_xlabel("kellaaeg")
 cb = fig.colorbar(im, ax=axes, shrink=0.5, pad=0.01)
 cb.set_label("suuna koormus, % täistasemest")
-fig.legend(handles=[Line2D([], [], color="black", lw=0.9, label=f"koormus {KOORMATUD}%"),
-                    Line2D([], [], marker="o", ls="", color="black", ms=3, label="seisak >= 5%")],
+fig.legend(handles=[Line2D([], [], color="black", lw=0.9, label=f"koormus {KOORMATUD:.0f}%"),
+                    Line2D([], [], marker="o", ls="", color="black", ms=3, label="mõni rada seisab")],
            loc="outside lower center", ncol=2)
 fig.suptitle(f"Koridorid: tavalise tööpäeva koormus ({NADAL[0]:%d.%m}-{NADAL[-1]:%d.%m.%Y}, {len(NADAL)} tööpäeva keskmine; "
              "ülal kesklinna ots)", x=0.01, ha="left", fontweight="bold")
@@ -306,7 +300,7 @@ for joonis_nr, kor in enumerate(KORIDORID, 2):        # joonised 28_02 ... 28_05
             axes[i, j].tick_params(labelsize=7)
     cb = fig.colorbar(im, ax=axes, shrink=0.6, pad=0.01)
     cb.set_label("suuna koormus, %")
-    fig.suptitle(f"{kor}: koormus tööpäevade kaupa (must joon = {KOORMATUD}%, täpp = seisak >= 5%; ülal kesklinna ots)",
+    fig.suptitle(f"{kor}: koormus tööpäevade kaupa (must joon = {KOORMATUD:.0f}%, täpp = mõni rada seisab; ülal kesklinna ots)",
                  x=0.01, ha="left", fontweight="bold")
     save(fig, f"28_{joonis_nr:02d}_paevad_{FAIL[kor]}")
 
@@ -322,7 +316,7 @@ for ax, kor in zip(axes, KORIDORID):
     ax.set_title(kor, fontsize=10)
 axes[-1].set_xlabel("tunni algus")
 cb = fig.colorbar(im, ax=axes, shrink=0.6, pad=0.01)
-cb.set_label(f"% tööpäevadest, tunnivoog >= {LAE_OSA:.0%} piirist")
+cb.set_label(f"% tööpäevadest, tunnisagedus >= {LAE_OSA:.0%} piirist")
 fig.suptitle(f"Koridoride ristmikud piiri lähedal: tööpäevad {w15.index.get_level_values('paev').min():%m.%Y}-"
              f"{w15.index.get_level_values('paev').max():%m.%Y} (15 min loendused, kõik suunad)", x=0.01, ha="left",
              fontweight="bold")

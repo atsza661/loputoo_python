@@ -17,7 +17,7 @@ SISEND
   Ainult mõlemad suunad koos ja 15 min samm: SUUND ja RES ei kehti.
 
 ARVUTUS
-  Profiilid nagu 07: E-R koolikuudel (september-mai) 2024-08...2026-08; ristmikul iga 15 min pilu keskmine, maanteel 07
+  Profiilid nagu 07: E-R koolikuudel (september-mai) 2024-08...2026-10; ristmikul iga 15 min pilu keskmine, maanteel 07
     15 min profiil (tunniprofiil x veerandtundide osakaalud).
   Kiirus:
     ristmik   mudel A: foori viivitus (HCM valem; ristmiku piir 27, tsükkel 09, g/C ja küllastusvoog 33) 500 m lõigul,
@@ -41,7 +41,7 @@ ARVUTUS
   Näitajad: tipuaja algus, lõpp ja kestus; tipuaja sõidukite osakaal ööpäeva liiklusest; keskmine voog tipuajal.
 
 CALCULATION IN PLAIN ENGLISH
-  Profiles as in 07 (2024-08 ... 2026-08, school-month workdays): junction = average 15-minute slot; highway = the 07
+  Profiles as in 07 (2024-08 ... 2026-10, school-month workdays): junction = average 15-minute slot; highway = the 07
     15-minute profile (hourly profile x quarter shares).
   Speed: junction = model A as in 06_2 (HCM delay on a 500 m stretch). Highway = measured mean speed = sum of (vehicles
     in speed band x band middle) / vehicles with a speed, from the 15-minute counts of the same months (a slot counts
@@ -75,10 +75,10 @@ from matplotlib.lines import Line2D
 from common import (OUT_DIR, SUUND, SPEED_COLS, SPEED_MID, STS_AKNAD, load_tallinn, load_15m, load_daily, counter_month,
                     ilma_vigaste_kuudeta, load_hourly_profile, day_calendar, mudeli_parameetrid, ristmike_kiirus,
                     ristmike_tipumura, tipu_mura, tipuaja_lavi, tipuaeg, tipuaja_naitajad, timing_map, bbox, map_extent,
-                    km, load_junctions, load_locations, set_style, save, save_table, hhmm, C_BLUE, C_ORANGE, GRID, TEXT2)
+                    km, load_junctions, load_locations, set_style, save, save_table, hhmm, C_BLUE, C_ORANGE, TEXT2)
 
 assert not SUUND, "07_2 teeb ainult mõlemad suunad koos (SUUND ei kehti)"
-P0, P1 = pd.Period("2024-08", "M"), pd.Period("2026-08", "M")     # nagu 07
+P0, P1 = pd.Period("2024-08", "M"), pd.Period("2026-10", "M")     # nagu 07
 SCHOOL_MONTHS = [9, 10, 11, 12, 1, 2, 3, 4, 5]
 MIN_PAEVI = 40          # maanteel kõikumine ja kiirus 15 min loendustest, kui täielikke tööpäevi on vähemalt nii palju
 MIN_SOIDUKEID = 20      # 15 min kiirus arvesse, kui pilus on vähemalt nii palju kiirusega sõidukeid (nagu 13)
@@ -179,7 +179,6 @@ assert (k.filter(like="_kestus_min") >= 15).all().all() and (k["hommik_lopp_h"] 
 save_table(k, "07_2_tipuajad_kohad")
 
 grp_order = [("Tallinn", "ristmik"), ("Tallinn", "sisse"), ("Tallinn", "välja"), ("Tallinn", "muu"),
-             ("Tartu", "sisse"), ("Tartu", "välja"), ("Pärnu", "sisse"), ("Pärnu", "välja"),
              ("Viimsi", "sisse"), ("Viimsi", "välja")]
 agg = dict(kohti=("koht", "size"))
 for tp in STS_AKNAD:
@@ -221,7 +220,7 @@ for i, tp in enumerate(STS_AKNAD):
         ax.set_xticks(range(len(order)))
         ax.set_xticklabels(order, fontsize=8)
 handles = [Line2D([], [], marker="o", ls="", color=TEXT2, alpha=0.6, markeredgecolor="none",
-                  label="ainult voo tingimus (sama tihe kui tipp)"),
+                  label="ainult sageduse tingimus (sama tihe kui tipp)"),
            Line2D([], [], marker="o", ls="", color=TEXT2, alpha=0.8, markeredgecolor="black",
                   label="ka kiiruse tingimus (tipp märgatavalt aeglasem)"),
            Line2D([], [], ls=":", color=TEXT2, label="60 min (07 tipptund)")]

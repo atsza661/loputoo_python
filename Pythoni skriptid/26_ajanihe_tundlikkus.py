@@ -56,11 +56,11 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from common import (paeva_maatriks, load_tallinn, load_vehicles, shift_peak, peak_hour, slot_label, set_style, save, save_table,
+from common import (LOGIJA_NADAL, paeva_maatriks, load_tallinn, load_vehicles, shift_peak, peak_hour, slot_label, set_style, save, save_table,
                     AM_WINDOW, PM_WINDOW, DIVERGING, C_BLUE, C_ORANGE, TEXT2)
 
 T09_ALGUS = "2026-09-01"                                       # 2026/27 õppeaasta algus
-SOIDUKI_PAEVAD = pd.to_datetime(["2026-10-16", "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"])
+SOIDUKI_PAEVAD = LOGIJA_NADAL
 NIHKED = [-60, -45, -30, -15, 15, 30, 45, 60]                  # min, miinus = varem
 OSAKAAL = np.arange(1, 16)                                     # %
 TIPUD = {"hommik": AM_WINDOW, "ohtu": PM_WINDOW}
@@ -128,7 +128,7 @@ p15 = w15.index.get_level_values("paev")
 print(f"15 min: {p15.nunique()} tööpäeva {p15.min():%d.%m}-{p15.max():%d.%m.%Y}, {len(prof['15min'])} ristmikku")
 
 # --- sõidukipõhised profiilid (1 min) ---------------------------------------------------------------------------------
-v = load_vehicles(None, koik=True)
+v = load_vehicles(None)
 v = v[v["ts"].dt.normalize().isin(SOIDUKI_PAEVAD)].assign(paev=lambda x: x["ts"].dt.normalize())
 v = v.sort_values(["mp_id", "kanal", "life"])
 d = v.groupby(["mp_id", "kanal", "paev"])["life"].diff()

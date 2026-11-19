@@ -45,7 +45,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 
 from common import (paeva_maatriks, load_tallinn, load_junctions, add_basemap, to_merc, map_extent, km, set_style, save, save_table, HALO,
-                    ramp, C_BLUE, C_ORANGE, C_GRAY, TEXT, TEXT2)
+                    ramp, C_BLUE, C_ORANGE, C_GRAY, TEXT)
 
 AKNAD = {"ooopaev": (0, 96), "hommik": (28, 36), "ohtu": (64, 72)}     # 15 min pilud
 MIN_PAEVI = 150

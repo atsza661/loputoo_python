@@ -11,14 +11,14 @@ SISEND
 
 ARVUTUS
   Mudel A (viivitus): koormusaste X = 4 x 15 min voog / C (C = ristmiku eeldatav piir, 27). Foori viivitus sõiduki kohta
-    HCM 2010 valemiga (common.hcm_viivitus): ühtlane osa (punane tuli, tsükli pikkus 09 ja g/C 33 järgi) + juhuslik ja
+    HCM 2000 valemiga (common.hcm_viivitus): ühtlane osa (punane tuli, tsükli pikkus 09 ja g/C 33 järgi) + juhuslik ja
     üleküllastuse osa (raja läbilaskevõime c = küllastusvoog x g/C, 33). Kiirus = LOIK_M (500 m) lõigu kiirus, kui
     vaba kiirusega (50 km/h) sõidule lisandub viivitus. Halvim tund = sõidukitega kaalutud tunnikeskmise suurim
     viivitus (tunni algus hommikul 06:00-09:45, õhtul 14:00-18:45).
     Piirangud: iga 15 min pilu arvutatakse eraldi ilma eelmise pilu järjekorrata (algjärjekord 0) ja kogu ristmik ühe
     esindusliku rajarühmana (ristmiku voog / ristmiku piir, mediaanne tsükkel ja g/C), mitte rajarühmade kaupa. See on
     võrdlev mudel: järjekorra kandumist järgmisse pilusse ja ühe üleküllastunud haru viivitust see ei näita.
-  Mudel B (ummikuosa): logija nädala (16., 19.-23.10.2026) 15 min piludest seos voog -> täis või seisakus kanalite osa
+  Mudel B (ummikuosa): logija nädala (16., 19.-22.10.2026) 15 min piludest seos voog -> täis või seisakus kanalite osa
     ristmiku täistasemest (24; täis = kanal laseb läbi >= 80% oma tavalisest päeva suurimast voost, seisak = loendur
     kaetud, aga läbi pääseb vähe), kasvav monotoonne regressioon (common.pav). Voog on tavalise tipptunni ühikutes
     (logija nädalal ja T09 2026. a sügisel eraldi), nii saab seose kanda ajaloolistele päevadele. Halvim tund =
@@ -43,7 +43,7 @@ ARVUTUS
     (Viljandi mnt Kangru loenduril pole alates 09.2025 ühtegi täielikku tööpäeva).
 
 CALCULATION IN PLAIN ENGLISH
-  Model A (delay). Degree of saturation X = 4 x 15-minute flow / C (expected limit, 27). Delay per vehicle (HCM 2010):
+  Model A (delay). Degree of saturation X = 4 x 15-minute flow / C (expected limit, 27). Delay per vehicle (HCM 2000):
     d1 = 0.5 x cycle x (1 - g/C)^2 / (1 - min(X, 1) x g/C)  (waiting at red)
     d2 = 900 x T x [(X - 1) + sqrt((X - 1)^2 + 8 x k x X / (c x T))], c = saturation flow x g/C, T = 0.25 h, k = 0.5.
     Speed on a 500 m stretch = 3.6 x 500 / (500 / (50 / 3.6) + delay). Worst hour = hour (start 06:00-09:45 or
@@ -294,26 +294,26 @@ for ax, nimi in zip(axes.flat, fitid):
     ax.axvline(tv, color=TEXT2, ls=":", lw=1.2)
     r = mh[(mh["tee"] == nimi) & (mh["tipp"] == "hommik")].iloc[0]
     f = lambda v: "> 30%" if not np.isfinite(v) else f"{v:.0f}%"
-    ax.text(0.03, 0.04, f"kõikumine: mõõdetud {r.koikumine_moodetud:.1f}%, voost {r.koikumine_voost:.1f}%\n"
+    ax.text(0.03, 0.04, f"kõikumine: mõõdetud {r.koikumine_moodetud:.1f}%, sagedusest {r.koikumine_voost:.1f}%\n"
                         f"murdepunkt: {f(r.murdepunkt_moodetud)} / {f(r.murdepunkt_voost)}".replace(".", ","),
             transform=ax.transAxes, fontsize=8, va="bottom", color=TEXT,
             bbox=dict(boxstyle="round,pad=0.3", fc="white", ec=GRID, alpha=0.9))
     ax.set_title(f"{nimi}, linna poole hommikul", fontsize=10)
-    ax.set_xlabel("voog, sõid/h")
+    ax.set_xlabel("sagedus, sõid/h")
     ax.set_ylabel("keskmine kiirus, km/h")
     ax.set_ylim(0, max(130, np.nanpercentile(y, 99.5)))
 ax = axes.flat[-1]
 k = mh.assign(silt=mh["tee"].str.replace(r" \(.*\)", "", regex=True) + " " + mh["tipp"].map({"hommik": "h", "ohtu": "õ"}))
 yy = np.arange(len(k))
 ax.barh(yy, k["koikumine_moodetud"], color=C_BLUE, alpha=0.75, height=0.6, label="mõõdetud kiirus")
-ax.plot(k["koikumine_voost"], yy, "o", color=C_ORANGE, ms=6, label="ainult voost (seose järgi)")
+ax.plot(k["koikumine_voost"], yy, "o", color=C_ORANGE, ms=6, label="ainult sagedusest (seose järgi)")
 ax.set_yticks(yy, k["silt"], fontsize=7.5)
 ax.invert_yaxis()
 ax.set_xlabel("päevast päeva kõikumine, % (kerge päev vs tavaline)")
 ax.set_title("Kõikumine: h = hommik linna, õ = õhtu välja", fontsize=10)
 ax.legend(fontsize=8, loc="center right")
-fig.suptitle("Kontroll mõõdetud kiirusega: sissesõiduteede voog ja kiirus (15 min, tööpäevad alates 01.09.2025); "
-             "murdepunkt mõõdetud / voost tuleneva kõikumise järgi", x=0.01, ha="left", fontweight="bold", fontsize=11.5)
+fig.suptitle("Kontroll mõõdetud kiirusega: sissesõiduteede sagedus ja kiirus (15 min, tööpäevad alates 01.09.2025); "
+             "murdepunkt mõõdetud / sagedusest tuleneva kõikumise järgi", x=0.01, ha="left", fontweight="bold", fontsize=11.5)
 fig.tight_layout()
 save(fig, "40_0_03_maanteed")
 

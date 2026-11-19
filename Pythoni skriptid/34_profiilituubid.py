@@ -44,7 +44,7 @@ VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/)
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.cluster.hierarchy import linkage, fcluster, dendrogram, set_link_color_palette
+from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
 from scipy.spatial.distance import pdist, squareform
 
 from common import (load_tallinn, load_junctions, add_basemap, to_merc, map_extent, km, set_style, save, save_table,

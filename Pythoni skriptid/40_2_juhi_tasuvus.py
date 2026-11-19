@@ -55,8 +55,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from common import (sts_andmed, viivitus, load_junctions, short_name, set_style, save, save_table, hhmm, C_BLUE,
-                    C_ORANGE, GRID, TEXT, TEXT2)
+from common import (sts_andmed, viivitus, load_junctions, set_style, save, save_table, hhmm, C_BLUE,
+                    C_ORANGE, GRID, TEXT)
 
 KORIDORID = {"Tartu mnt": [34, 35, 39, 19], "Paldiski mnt": [7, 3, 12, 11, 16],
              "Tammsaare tee": [10, 43, 8, 9], "Sõpruse pst": [1, 8]}            # nagu 28

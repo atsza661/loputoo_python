@@ -8,27 +8,24 @@ SISEND
   common.load_daily(), counter_month()               maanteeloendurite päevasummad ja kehtivad loendur-kuud
   common.load_locations(), highway.counter_channel   loendurite asukohad ja radade nimed (nt "Tartu - Tallinn")
   common.load_15m()                                  maanteeloendurite 15 min loendused (Harjumaa loendurid)
-  common.load_datex_quarters(), load_datex_sites()   DATEX II 15 min vood ühe ööpäeva kohta (loendurid, millel oma
-                                                     15 min loendusi pole)
-  common.load_vehicles(), five_min_shares()          sõidukipõhine ööpäev ristmike 15 min pilude jagamiseks 5 min osadeks
+  common.load_vehicles(), five_min_shares()          logija nädala tööpäevad ristmike 15 min pilude jagamiseks 5 min osadeks
   common.load_fuel_county()                          Harjumaa kütusemüük
   Keskkonnamuutujad: RES=15 -> ristmikel toored 15 min andmed (failid *_15min); SUUND=LSS|LVS -> ainult Tallinna kaardi
   ala maanteeloendurid selles suunas; Harjumaa kaarti ning päeva- ja kuuindekseid siis ei tehta.
 
 ARVUTUS
-  Ühine periood 2024-08 ... 2026-08. Profiilid: E-R koolikuudel (september-mai), sest maanteede tunniprofiil on kuu
-    kaupa ja pühi ei saa sealt eraldada; ristmike profiil on tehtud samadel alustel. Tunnid on kellatunnid.
-  Loenduri linn ja suund: loendur kuulub linna (Tallinn, Tartu, Pärnu, Viimsi) juurde, kui see on linnast kuni 20 km
+  Ühine periood 2024-08 ... 2026-10 (kütuse võrdlus ainult kuni 2026-08, kütuse andmete lõpp). Profiilid: E-R
+    koolikuudel (september-mai), sest maanteede tunniprofiil on kuu kaupa ja pühi ei saa sealt eraldada; ristmike
+    profiil on tehtud samadel alustel. Tunnid on kellatunnid.
+  Loenduri linn ja suund: loendur kuulub Tallinna või Viimsi juurde, kui see on sellest kuni 20 km
     (linnulennult). Suund loetakse raja nimest: sihtkoht linn = "sisse", lähtekoht linn = "välja", muu = "muu" (nt
     ringtee).
   Tunniprofiil: loenduri suuna keskmine sõidukite arv igal kellatunnil (vähemalt ~60 tööpäeva, kõik 24 tundi olemas,
     kahtlase mahuga kuud välja); ristmikul läheb tund arvesse ainult siis, kui kõik 4 veerandtundi on olemas.
   Peenem ajasamm tipunäitajate jaoks:
-    ristmikud   15 min profiil jagatakse 5 min osadeks sõidukipõhise ööpäeva järgi (common.five_min_shares)
-    maanteed    tunniprofiil jagatakse veerandtundideks 1) loenduri enda 15 min loenduste osakaaludega samadelt
-                päevadelt või, kui neid pole, 2) lähima DATEX II loenduskoha (<= 300 m) ööpäeva osakaaludega. DATEX-i
-                suund sobitatakse tunniprofiilide korrelatsiooni järgi (parim paar enne, kumbki üks kord); puuduv tund
-                jagatakse ühtlaselt. Ülejäänud maanteeloenduritel jäävad tunnid.
+    ristmikud   15 min profiil jagatakse 5 min osadeks logija nädala tööpäevade järgi (common.five_min_shares)
+    maanteed    tunniprofiil jagatakse veerandtundideks loenduri enda 15 min loenduste osakaaludega samadelt
+                päevadelt. Ülejäänud maanteeloenduritel jäävad tunnid.
   Tipunäitajad (common.peak_metrics): tipptunni algus, osakaal ööpäevast, teoreetiline hajutamise potentsiaal (+-1 h)
     ja liikluse keskaeg = mahuga kaalutud keskmine kellaaeg aknas (hommik 06-10, õhtu 15-19).
   Päevaindeks: koha päeva maht jagatud sama koha sama nädalapäeva 2025. a keskmisega (kohtade summad), x 100; päev jääb
@@ -39,14 +36,13 @@ ARVUTUS
     kerged ja rasked sõidukid; korrelatsioon Harjumaa müügiindeksiga tasemes, kuumuutustes ja aastamuutustes.
 
 CALCULATION IN PLAIN ENGLISH
-  Common period 2024-08 ... 2026-08, Monday-Friday in school months (September-May).
+  Common period 2024-08 ... 2026-10 (fuel only to 2026-08), Monday-Friday in school months (September-May).
   Counter city and direction: a highway counter belongs to a city when it is within 20 km (straight line). The lane name
     gives the direction: city as destination = inbound, city as origin = outbound.
   Hourly profile = average vehicles of the counter direction in each clock hour (complete days only, at least ~60
     workdays, suspicious months left out). A junction hour counts only when all four 15-minute slots exist.
-  Finer steps: junction 15-minute values are split into 5-minute parts by the per-vehicle day. A highway hour is split
-    into quarters by the counter's own 15-minute shares on the same days, or else by the shares of the nearest DATEX II
-    site (within 300 m; the direction is matched by the best correlation of hourly profiles).
+  Finer steps: junction 15-minute values are split into 5-minute parts by the logger-week workdays. A highway hour is split
+    into quarters by the counter's own 15-minute shares on the same days; other highway counters keep whole hours.
   Peak metrics as in 06 (start, share of day, spreading potential, traffic midpoint).
   Daily index: a place's daily volume / the same place's 2025 average for that weekday, summed over places, x 100; a day
     is dropped when fewer than 70% of the usual places report. Highway counter-days below 40% or above 250% of the
@@ -59,6 +55,12 @@ VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/; suunaanalüüsi
       Näitab: tööpäeva liikluse jaotust linna sisse- ja väljasõidul linnade kaupa.
       Kuidas: paneel linna kohta; x-telg = kellaaeg, y-telg = osakaal ööpäeva liiklusest, % tunnis. Sinine = sissesõit,
       oranž = väljasõit, türkiis katkendjoon = muu; Tallinna paneelil tume joon = linna ristmikud.
+  07_01b_tallinn.png
+      Näitab: 07_01 Tallinna paneel eraldi: linna ristmikud, sissesõit ja väljasõit (osakaal ööpäevast tunnis).
+  07_01p_profiilid_linnad.png, 07_01bp_tallinn.png
+      Näitab: nagu 07_01 ja 07_01b, aga Tallinna sisse- ja väljasõit on linna piiriloendurid (common.PIIR_*): Kakumäe
+      maanteeloendur ja üheksa linna serva ristmikku (15 min profiil x logija nädala LSS/LVS osakaal samas pilus).
+  07_piir_tipud.csv   linna piiriloenduri ja suuna tipunäitajad (peak_metrics 15 min profiilist), nagu 07_tipptunnid_kohad
   07_02_tipu_teravus.png
       Näitab: kui terav on tipp eri linnades ja suundades.
       Kuidas: punktdiagrammid 2 x 2 (veerud: hommik, õhtu). Ülal tipptunni osakaal ööpäevast, %; all teoreetiline
@@ -75,6 +77,9 @@ VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/; suunaanalüüsi
       nädalapäev 2025 = 100). Paremal hajuvusdiagramm: punkt = päev, x = sissesõiduteede, y = ristmike indeks; värv =
       päevatüüp (sinine = tööpäev õppetöö ajal, türkiis = tööpäev vaheajal, hall = nädalavahetus, oranž = püha või
       lühendatud päev); punktiir = võrdsuse joon; pealkirjas r ja n.
+  07_06p_paevane_seos.png
+      Näitab: nagu 07_06, aga sissesõiduteede asemel linna piiriloendurid (Kakumäe + üheksa linna serva ristmikku,
+      mõlemad suunad) ja ristmikud ilma nende üheksata.
   07_07_kutus_harju.png
       Näitab: liiklusindeksite ja Harjumaa kütusemüügi käiku kuude kaupa.
       Kuidas: joondiagramm; y-telg = indeks (2025 = 100). Tume katkendjoon = ristmikud, sinine = Harjumaa
@@ -82,36 +87,35 @@ VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/; suunaanalüüsi
   07_loendurid_suunad.csv          iga raja linn, kaugus ja suund
   07_tipptunnid_kohad.csv          tipunäitajad loenduskoha kaupa
   07_linnad_kokkuvote.csv          mediaanid linna ja suuna kaupa
-  07_maantee_15min_osakaalud.csv   veerandtundide osakaalud tunnis ja nende allikas (15 min loendus või DATEX)
+  07_maantee_15min_osakaalud.csv   veerandtundide osakaalud tunnis (loenduri enda 15 min loendustest)
   07_maantee_profiilid.csv         Tallinna kaardi maanteeloendurite 15 min profiilid (06 kasutab; 07 käib enne 06)
   07_maantee_profiilid_koik.csv    kõigi maanteeloendurite 15 min profiilid (07_2 kasutab)
   07_paevane_seos.csv, 07_paevane_korrelatsioon.csv, 07_kuuindeksid.csv, 07_kutus_korrelatsioon.csv
 """
 import sys
+import textwrap
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from common import (load_tallinn, load_junctions, load_locations, load_daily, counter_month,
+from common import (PIIR_MAANTEE, PIIR_RISTMIKUD, direction_share, load_tallinn, load_junctions, load_locations, load_daily, counter_month,
                     load_fuel_county, peak_metrics, ratio_index, corr_pair, set_style, save, day_calendar,
-                    add_basemap, to_merc, load_vehicles, five_min_shares, to_5min, load_datex_quarters,
+                    load_vehicles, five_min_shares, to_5min,
                     SUUND, SUUND_MAANTEE, RES, km, ends, load_15m, ilma_vigaste_kuudeta, bbox, map_extent, timing_map,
-                    save_table, CLASS_COLS, tabel, load_hourly_profile, load_datex_sites, TALLINN_BASE_YEAR,
-                    C_BLUE, C_ORANGE, C_AQUA, C_YELLOW, C_GRAY, TEXT2)
+                    save_table, CLASS_COLS, tabel, load_hourly_profile, TALLINN_BASE_YEAR,
+                    C_BLUE, C_ORANGE, C_AQUA, C_GRAY, TEXT2)
 
 set_style()
 pd.set_option("display.width", 220)
 pd.set_option("display.max_columns", 30)
 
-P0, P1 = pd.Period("2024-08", "M"), pd.Period("2026-08", "M")
+P0, P1 = pd.Period("2024-08", "M"), pd.Period("2026-10", "M")   # maanteede tunniandmed kuni 31.10.2026; kütus inner join kuni 2026-08
 SCHOOL_MONTHS = [9, 10, 11, 12, 1, 2, 3, 4, 5]
 RADIUS_KM = 20
-CITIES = {"Tallinn": (59.4372, 24.7454), "Tartu": (58.3806, 26.7225),
-          "Pärnu": (58.3859, 24.4971), "Viimsi": (59.5040, 24.8340)}
-LABEL_NAME = {"Tallinn": ("tallinn", "talinn"), "Tartu": ("tartu",), "Pärnu": ("parnu", "pärnu"),
-              "Viimsi": ("viimsi",)}
+CITIES = {"Tallinn": (59.4372, 24.7454), "Viimsi": (59.5040, 24.8340)}   # töö käsitleb ainult Tallinna ümbrust (19.11.2026)
+LABEL_NAME = {"Tallinn": ("tallinn", "talinn"), "Viimsi": ("viimsi",)}
 SUUND_COLOR = {"sisse": C_BLUE, "välja": C_ORANGE, "muu": C_AQUA}
 
 
@@ -214,50 +218,14 @@ m15 = m15.merge(cat[["id", "kanal", "linn", "suund"]], on=["id", "kanal"])
 q15 = (m15.groupby(["id", "linn", "suund", m15.ts.dt.hour.rename("tund"), (m15.ts.dt.minute // 15).rename("osa")])["v"]
        .sum().unstack("osa"))
 sh15 = q15.div(q15.sum(axis=1).where(q15.sum(axis=1) > 0), axis=0)
-oma15 = set()
 for key in site_h.index.intersection(sh15.index.droplevel("tund").unique()):
     q4 = sh15.loc[key].reindex(range(24))
     if q4.notna().all().all():
-        oma15.add(key)
-        jaga(key, q4.values, allikas="15 min loendus", datex_site="", datex_nimi="", r=np.nan, datex_tund=True)
-
-# 2) Ülejäänud loendurid: DATEX II ööpäeva (common.load_datex_quarters) järgi. DATEX koht = lähim loendur (<= 300 m);
-#    suund (UUID-1/-2) sobitatakse tunniprofiilide korrelatsiooniga (kumbki DATEX suund ühele profiilile).
-dq = load_datex_quarters()
-if dq is not None:
-    ds = load_datex_sites()
-    kxy = km(ds.lat.values[:, None], ds.lon.values[:, None], loc.latitude.values[None], loc.longitude.values[None])
-    ds = ds.assign(id=loc.id.values[kxy.argmin(1)], m=kxy.min(1) * 1000)[kxy.min(1) <= 0.3]
-    dq = dq[dq.start.dt.dayofweek < 5].assign(tund=dq.start.dt.hour, paev=dq.start.dt.normalize())   # tööpäevad
-    dq = dq[dq.groupby(["site", "paev", "tund"])["c"].transform("size") == 4]    # ainult tunnid, kus kõik 4 veerandit
-    dh = (dq.groupby(["site", "paev", "tund"])["c"].sum().groupby(["site", "tund"]).mean()
-          .unstack().reindex(columns=range(24)))                                 # mitme päeva keskmine tund
-    q4 = dq.groupby(["site", "tund", (dq.start.dt.minute // 15).rename("osa")])["c"].sum().unstack("osa")
-    sh = q4.div(q4.sum(axis=1).where(q4.sum(axis=1) > 0), axis=0)
-    pairs = []
-    for key, v in site_h.iterrows():
-        for s in ds.loc[ds.id == key[0], "site"] if key not in oma15 else []:
-            r = pd.Series(v.values).corr(pd.Series(dh.loc[s].values), min_periods=12) if s in dh.index else np.nan
-            if r == r:                                                     # mitte NaN
-                pairs.append((r, key, s))
-    used = set()
-    for r, key, s in sorted(pairs, key=lambda x: -x[0]):              # parim paar enne, kumbki üks kord
-        if key in used or s in used:
-            continue
-        used |= {key, s}
-        q4 = sh.reindex(pd.MultiIndex.from_product([[s], range(24)]))
-        olemas = q4.notna().all(axis=1).values
-        jaga(key, q4.fillna(0.25).values, allikas="DATEX", datex_site=s,          # puuduv tund: ühtlane jaotus
-             datex_nimi=ds.set_index("site").nimi[s], r=round(r, 3), datex_tund=olemas)
+        jaga(key, q4.values)
 if rows:
-    out = pd.concat(rows)
-    save_table(out[["id", "linn", "suund", "allikas", "datex_site", "datex_nimi", "r", "tund", "datex_tund",
-                    "osa_0", "osa_1", "osa_2", "osa_3"]], "07_maantee_15min_osakaalud")
-    dx = out[out.allikas == "DATEX"]
-    print(f"Maanteed 15 min täpsusega: {len(rows)} profiili {len(site_h)}-st - {len(oma15)} loenduri enda 15 min loendustest, "
-          f"{len(rows) - len(oma15)} DATEX-i ööpäeva järgi"
-          + (f" (sobitus r mediaan {dx.groupby('datex_site').r.first().median():.2f}; tipptundidest DATEX-i veerandid "
-             f"{dx[dx.tund.isin([6, 7, 8, 9, 15, 16, 17, 18])].datex_tund.mean() * 100:.0f}%)" if len(dx) else ""))
+    save_table(pd.concat(rows)[["id", "linn", "suund", "tund", "osa_0", "osa_1", "osa_2", "osa_3"]],
+               "07_maantee_15min_osakaalud")
+    print(f"Maanteed 15 min täpsusega: {len(rows)} profiili {len(site_h)}-st (loenduri enda 15 min loendustest)")
 save_table(sites, "07_tipptunnid_kohad")
 save_table(pd.DataFrame([{"id": k[0], "linn": k[1], "suund": k[2], "samm": hw_res[k],     # kõik maanteed (07_2)
                           **{str(i): x for i, x in enumerate(np.round(v, 2))}} for k, v in hw15.items()]),
@@ -265,7 +233,6 @@ save_table(pd.DataFrame([{"id": k[0], "linn": k[1], "suund": k[2], "samm": hw_re
 
 # linnade kokkuvõte (mediaanid)
 grp_order = [("Tallinn", "ristmik"), ("Tallinn", "sisse"), ("Tallinn", "välja"), ("Tallinn", "muu"),
-             ("Tartu", "sisse"), ("Tartu", "välja"), ("Pärnu", "sisse"), ("Pärnu", "välja"),
              ("Viimsi", "sisse"), ("Viimsi", "välja")]
 summ = (sites.groupby(["linn", "suund"])
         .agg(kohti=("koht", "size"), hommik_algus_h=("hommik_algus_h", "median"),
@@ -286,17 +253,21 @@ print(summ.round(1).to_string())
 share = lambda df: df.sum(axis=0) / df.sum(axis=0).sum() * 100
 cities = [c for c in CITIES if c == "Tallinn" or c in site_h.index.get_level_values("linn")]
 nr = (len(cities) + 1) // 2
-fig, axes = plt.subplots(nr, 2, figsize=(13, 4.25 * nr), sharex=True, sharey=True, squeeze=False)
 H = np.arange(24) + 0.5
-for ax, city in zip(axes.flat, cities):
+def linnapaneel(ax, city, piir=None):
+    """Linna tunniprofiilid; piir = piiriloendurite tunniprofiilid (read (koht, suund)) Tallinna sisse/välja asemel."""
     for suund, col, lab in [("sisse", C_BLUE, "sissesõit linna"), ("välja", C_ORANGE, "väljasõit linnast"),
                             ("muu", C_AQUA, "muu (nt ringtee)")]:
-        sub = site_h[(site_h.index.get_level_values("linn") == city) &
-                     (site_h.index.get_level_values("suund") == suund)]
+        if piir is not None and city == "Tallinn":
+            sub = piir[piir.index.get_level_values("suund") == suund]
+            n_c, mis = sub.index.get_level_values("koht").nunique(), "piiriloendurit"
+        else:
+            sub = site_h[(site_h.index.get_level_values("linn") == city) &
+                         (site_h.index.get_level_values("suund") == suund)]
+            n_c, mis = sub.index.get_level_values("id").nunique(), "loendurit"
         if len(sub):
-            n_c = sub.index.get_level_values("id").nunique()
             ax.plot(H, share(sub), color=col, lw=1.8, ls="-" if suund != "muu" else "--",
-                    label=f"{lab} ({n_c} loendurit)")
+                    label=f"{lab} ({n_c} {mis})")
     if city == "Tallinn":                           # ristmikud 5/15 min sammuga, ühik sama (% tunni kohta)
         k = jfine.shape[1] // 24
         ax.plot((np.arange(24 * k) + 0.5) / k, share(jfine) * k, color=TEXT2, lw=1.8,
@@ -305,14 +276,57 @@ for ax, city in zip(axes.flat, cities):
     ax.legend(fontsize=8, loc="upper left")
     ax.set_xticks(range(0, 25, 3))
     ax.set_xlim(0, 24)
-for ax in axes[-1]:
+
+
+# piiriloendurid (common.PIIR_*): Kakumäe tunniprofiil suunaga + linna serva ristmiku 15 min profiil x logija nädala
+# suuna osakaal samas pilus (nagu suunaanalüüsis), tundideks liidetud
+PIIR = None
+if not SUUND:
+    vk = load_vehicles(None)
+    nimi = jn.set_index("mp_id")
+    PIIR15 = pd.concat([pd.DataFrame({(PIIR_MAANTEE[i], su): hw15[(i, "Tallinn", su)] for i in PIIR_MAANTEE
+                                      for su in ("sisse", "välja")}).T]
+                       + [pd.DataFrame({(f"{nimi.loc[mp, 'code']} {nimi.loc[mp, 'name']}", su):
+                                        (p15.loc[mp] * direction_share(vk, s)[0].set_index(["mp_id", "slot"])["osa"].loc[mp]).values
+                                        for mp in PIIR_RISTMIKUD}).T for s, su in (("LSS", "sisse"), ("LVS", "välja"))])
+    del vk
+    PIIR15 = PIIR15.rename_axis(["koht", "suund"])
+    assert len(PIIR15) == 2 * (len(PIIR_MAANTEE) + len(PIIR_RISTMIKUD)) and PIIR15.notna().all().all()
+    PIIR = PIIR15.T.groupby(np.arange(96) // 4).sum().T                       # tunniprofiilid (07_01p, 07_01bp)
+    # tipunäitajad nagu 07_linnad_kokkuvote (loenduskoha kaupa, 15 min profiilist; kokkuvõttes mediaan)
+    pt = pd.DataFrame([dict(koht=k, suund=su, **peak_metrics(v.values, per_hour=4)) for (k, su), v in PIIR15.iterrows()])
+    save_table(pt, "07_piir_tipud")
+    for su, aeg in (("sisse", "hommik"), ("välja", "ohtu")):
+        x = pt[pt["suund"] == su]
+        print(f"Piiriloendurid, {su}: {dict(hommik='hommikuse', ohtu='õhtuse')[aeg]} tipptunni osakaal ööpäevast mediaanina {x[f'{aeg}_osakaal_%'].median():.1f}% "
+              f"(vahemik {x[f'{aeg}_osakaal_%'].min():.1f}-{x[f'{aeg}_osakaal_%'].max():.1f}%, {len(x)} kohta); "
+              f"summaprofiili tipptund {share(PIIR.xs(su, level='suund')).max():.1f}% ööpäevast")
+PIIR_LOEND = "Piiriloendurid (ristmikul suund logija nädala osakaalu järgi): " + ", ".join(
+    dict.fromkeys(PIIR.index.get_level_values(0))) + "." if PIIR is not None else ""
+for lisa, piir in [("", None)] + ([("p", PIIR)] if PIIR is not None else []):
+    fig, axes = plt.subplots(nr, 2, figsize=(13, 4.25 * nr), sharex=True, sharey=True, squeeze=False)
+    for ax, city in zip(axes.flat, cities):
+        linnapaneel(ax, city, piir)
+    for ax in axes[-1]:
+        ax.set_xlabel("Kellaaeg")
+    for ax in axes[:, 0]:
+        ax.set_ylabel("Osakaal ööpäeva liiklusest, % tunnis")
+    fig.suptitle("Tööpäeva tunniprofiil linnade kaupa (E-R, september-mai, 2024-2026)"
+                 + ("; Tallinnas linna piiriloendurid" if piir is not None else ""), x=0.01, ha="left", fontweight="bold")
+    if piir is not None:
+        fig.text(0.01, 0.003, textwrap.fill(PIIR_LOEND, 160), fontsize=7.5, color=TEXT2, va="bottom")
+    fig.tight_layout(rect=(0, 0.03 if piir is not None else 0, 1, 1))
+    save(fig, f"07_01{lisa}_profiilid_linnad")
+    fig, ax = plt.subplots(figsize=(10, 5.4 if piir is not None else 5))
+    linnapaneel(ax, "Tallinn", piir)
     ax.set_xlabel("Kellaaeg")
-for ax in axes[:, 0]:
     ax.set_ylabel("Osakaal ööpäeva liiklusest, % tunnis")
-fig.suptitle("Tööpäeva tunniprofiil linnade kaupa (E-R, september-mai, 2024-2026)",
-             x=0.01, ha="left", fontweight="bold")
-fig.tight_layout()
-save(fig, "07_01_profiilid_linnad")
+    ax.set_title(f"Tallinn: linna ristmikud ja {'linna piiriloendurid' if piir is not None else 'sissesõiduteed'}, "
+                 "tööpäeva tunniprofiil (E-R, september-mai, 2024-2026)", fontsize=10, loc="left")
+    if piir is not None:
+        fig.text(0.01, 0.005, textwrap.fill(PIIR_LOEND, 130), fontsize=7.5, color=TEXT2, va="bottom")
+    fig.tight_layout(rect=(0, 0.08 if piir is not None else 0, 1, 1))
+    save(fig, f"07_01b{lisa}_tallinn")
 
 # 07_02_tipu_teravus: tipptunni osakaal ööpäevast ja teoreetiline hajutamise potentsiaal
 sites["grupp"] = sites["linn"] + "\n" + sites["suund"]
@@ -398,48 +412,56 @@ def day_index(df):
     return (g["v"] / g["b"] * 100).rename("indeks"), g["n"]
 
 
-ji, jn_ = day_index(jd)
-hi, hn_ = day_index(cd)
-dx = pd.DataFrame({"ristmikud": ji, "maanteed": hi}).dropna()
-dx = dx.join(day_calendar(dx.index).set_index("paev"))
-dx["tyyp"] = np.where(dx.paevatyyp.isin(["riigipüha", "lühendatud"]), "püha / lühendatud",
-                      np.where(dx.paevatyyp == "tööpäev",
-                               np.where(dx.vaheaeg == "kool", "tööpäev, õppetöö", "tööpäev, vaheaeg"),
-                               "nädalavahetus"))
-save_table(dx.reset_index(names="paev"), "07_paevane_seos")
-drows = [dict(valim="kõik päevad", **corr_pair(dx.ristmikud, dx.maanteed))]
-for ty, g in dx.groupby("tyyp"):
-    drows.append(dict(valim=ty, **corr_pair(g.ristmikud, g.maanteed)))
-dcorr = pd.DataFrame(drows)
-save_table(dcorr, "07_paevane_korrelatsioon")
-print("\nPäevaindeksite korrelatsioon (ristmikud vs Tallinna sissesõiduteed):")
-print(dcorr.round(3).to_string(index=False))
+def paevane(ji, jn_, hi, hn_, lisa="", silt_r="Tallinna ristmikud", silt_m="Tallinna sissesõiduteed",
+            vs="linna ristmikud vs sissesõiduteed"):
+    """07_06: päevaindeksid ji (ristmikud) ja hi (võrreldav rühm), kohtade arvud jn_ ja hn_; lisa = failinime lisa."""
+    dx = pd.DataFrame({"ristmikud": ji, "maanteed": hi}).dropna()
+    dx = dx.join(day_calendar(dx.index).set_index("paev"))
+    dx["tyyp"] = np.where(dx.paevatyyp.isin(["riigipüha", "lühendatud"]), "püha / lühendatud",
+                          np.where(dx.paevatyyp == "tööpäev",
+                                   np.where(dx.vaheaeg == "kool", "tööpäev, õppetöö", "tööpäev, vaheaeg"),
+                                   "nädalavahetus"))
+    save_table(dx.reset_index(names="paev"), f"07_paevane_seos{lisa}")
+    drows = [dict(valim="kõik päevad", **corr_pair(dx.ristmikud, dx.maanteed))]
+    for ty, g in dx.groupby("tyyp"):
+        drows.append(dict(valim=ty, **corr_pair(g.ristmikud, g.maanteed)))
+    dcorr = pd.DataFrame(drows)
+    save_table(dcorr, f"07_paevane_korrelatsioon{lisa}")
+    print(f"\nPäevaindeksite korrelatsioon ({silt_r} vs {silt_m}):")
+    print(dcorr.round(3).to_string(index=False))
 
-fig, axes = plt.subplots(1, 2, figsize=(15, 5.2), gridspec_kw=dict(width_ratios=[1.6, 1]))
-ax = axes[0]
-roll = dx[["ristmikud", "maanteed"]].rolling(7, center=True, min_periods=5).mean()
-ax.plot(roll.index, roll.ristmikud, color=TEXT2, lw=2, label=f"Tallinna ristmikud ({int(jn_.median())})")
-ax.plot(roll.index, roll.maanteed, color=C_BLUE, lw=2,
-        label=f"Tallinna sissesõiduteed, mõlemad suunad ({int(hn_.median())})")
-ax.axhline(100, color=TEXT2, lw=0.6, ls=":")
-ax.set_ylabel(f"Indeks (sama nädalapäev {TALLINN_BASE_YEAR} = 100)")
-ax.set_title("Päevane liiklus, 7 päeva libisev keskmine: linna ristmikud vs sissesõiduteed")
-ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.08), ncol=2, fontsize=9)
-ax = axes[1]
-pal = {"tööpäev, õppetöö": C_BLUE, "tööpäev, vaheaeg": C_AQUA, "nädalavahetus": C_GRAY,
-       "püha / lühendatud": C_ORANGE}
-for ty, col in pal.items():
-    g = dx[dx.tyyp == ty]
-    ax.scatter(g.maanteed, g.ristmikud, s=14, color=col, alpha=0.7, label=ty, edgecolor="none")
-lim = [dx[["ristmikud", "maanteed"]].min().min() - 3, dx[["ristmikud", "maanteed"]].max().max() + 3]
-ax.plot(lim, lim, color=TEXT2, lw=0.6, ls=":")
-c0 = dcorr.iloc[0]
-ax.set_title(f"Päevaindeksid (r = {c0.r:.2f}, n = {int(c0.n)})")
-ax.set_xlabel("Sissesõiduteed, indeks")
-ax.set_ylabel("Ristmikud, indeks")
-ax.legend(fontsize=8, loc="upper left")
-fig.tight_layout()
-save(fig, "07_06_paevane_seos")
+    fig, axes = plt.subplots(1, 2, figsize=(15, 5.2), gridspec_kw=dict(width_ratios=[1.6, 1]))
+    ax = axes[0]
+    roll = dx[["ristmikud", "maanteed"]].rolling(7, center=True, min_periods=5).mean()
+    ax.plot(roll.index, roll.ristmikud, color=TEXT2, lw=2, label=f"{silt_r} ({int(jn_.median())})")
+    ax.plot(roll.index, roll.maanteed, color=C_BLUE, lw=2,
+            label=f"{silt_m}, mõlemad suunad ({int(hn_.median())})")
+    ax.axhline(100, color=TEXT2, lw=0.6, ls=":")
+    ax.set_ylabel(f"Indeks (sama nädalapäev {TALLINN_BASE_YEAR} = 100)")
+    ax.set_title(f"Päevane liiklus, 7 päeva libisev keskmine: {vs}")
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.08), ncol=2, fontsize=9)
+    ax = axes[1]
+    pal = {"tööpäev, õppetöö": C_BLUE, "tööpäev, vaheaeg": C_AQUA, "nädalavahetus": C_GRAY,
+           "püha / lühendatud": C_ORANGE}
+    for ty, col in pal.items():
+        g = dx[dx.tyyp == ty]
+        ax.scatter(g.maanteed, g.ristmikud, s=14, color=col, alpha=0.7, label=ty, edgecolor="none")
+    lim = [dx[["ristmikud", "maanteed"]].min().min() - 3, dx[["ristmikud", "maanteed"]].max().max() + 3]
+    ax.plot(lim, lim, color=TEXT2, lw=0.6, ls=":")
+    c0 = dcorr.iloc[0]
+    ax.set_title(f"Päevaindeksid (r = {c0.r:.2f}, n = {int(c0.n)})")
+    ax.set_xlabel(f"{silt_m}, indeks")
+    ax.set_ylabel(f"{silt_r}, indeks")
+    ax.legend(fontsize=8, loc="upper left")
+    fig.tight_layout()
+    save(fig, f"07_06{lisa}_paevane_seos")
+
+
+paevane(*day_index(jd), *day_index(cd))
+# piiriloendurid (common.PIIR_*): Kakumäe maanteeloendur ja üheksa linna serva ristmikku vs ülejäänud ristmikud
+pd_ = pd.concat([cd[cd["koht"].isin(PIIR_MAANTEE)], jd[jd["koht"].isin(PIIR_RISTMIKUD)].assign(koht=lambda x: "MP" + x["koht"].astype(str))])
+paevane(*day_index(jd[~jd["koht"].isin(PIIR_RISTMIKUD)]), *day_index(pd_), "p", "Ülejäänud Tallinna ristmikud",
+        "Linna piiriloendurid", "ülejäänud ristmikud vs linna piiriloendurid")
 
 # --- d) Kuuindeksid vs Harjumaa kütus ----------------------------------------------------------------
 dv = day[day["kehtiv"]].assign(kuu=day["paev"].dt.to_period("M"))

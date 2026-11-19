@@ -4,7 +4,7 @@ palju kui tagasi, kui arvestada ainult täpselt vastupidiseid manöövreid (A ->
 teeb kumbagi üks kord päevas.
 
 SISEND
-  common.load_vehicles(None, koik=True)   sõidukipõhised kirjed (tallinn.vehicle_passage): ristmik, kanal, aeg
+  common.load_vehicles(None)   sõidukipõhised kirjed (tallinn.vehicle_passage): ristmik, kanal, aeg
   common.load_manoeuvres()                kanal -> manööver: lähteharu (from_leg) ja sihtharu (to_leg)
   common.maantee_suunad()                 sissesõiduteede maanteeloendurite 15 min loendused suundade kaupa
   common.load_junctions()                 ristmike nimed
@@ -88,11 +88,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-from common import (tervetel_paevadel, SOIDUKID_PAEV, maantee_suunad, load_vehicles, load_manoeuvres, load_junctions,
+from common import (LOGIJA_NADAL, tanavanimi, tervetel_paevadel, SOIDUKID_PAEV, maantee_suunad, load_vehicles, load_manoeuvres, load_junctions,
                     day_calendar, set_style, save, save_table, short_name, TEXT, TEXT2, C_BLUE, C_ORANGE, C_GRAY, C_AQUA,
                     C_YELLOW, C_MAGENTA, C_GREEN, C_VIOLET)
 
-NADAL = pd.to_datetime(["2026-10-16", "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"])   # nagu 32
+NADAL = LOGIJA_NADAL
 ALGUS_MAANTEE = "2024-08-01"
 MAANTEED = [("Peterburi tee (Loo)", "0cfcf | narva - tallinn"), ("Tartu mnt", "0f55c | tartu - tallinn"),
             ("Pärnu mnt (Laagri)", "8560b | peoleo - tallinn"), ("Viljandi mnt (Kangru)", "1d86e | rapla - tallinn"),
@@ -144,7 +144,7 @@ def vastassuund(site):
 def haru(nimi):
     """'3 Sõpruse pst (SW)' -> 'Sõpruse pst (SW)': number eest ära, ' side' -> ' pool'; ilmakaar jääb, sest samal
     ristmikul võib sama tänav olla kaks haru (nt MP33 Pärnu mnt põhjast ja lõunast)."""
-    return re.sub(r"^\d+\s+", "", nimi).replace(" side", " pool")
+    return tanavanimi(re.sub(r"^\d+\s+", "", nimi).replace(" side", " pool"))      # Tartu/Pärnu -> ... mnt
 
 
 def kokku_rida(s, v, nimi):
@@ -168,7 +168,7 @@ dm["mp_id"] = dm["mp"].str[2:].astype(int)
 dm = dm.dropna(subset=["from_leg", "to_leg"]).assign(a=lambda z: z["from_leg"].str.strip(), b=lambda z: z["to_leg"].str.strip())
 dm = vastaspaarid(dm[dm["a"] != dm["b"]])
 
-v = load_vehicles(None, koik=True)
+v = load_vehicles(None)
 v = tervetel_paevadel(v[v["ts"].dt.normalize().isin(NADAL)])
 v = v[v["ts"].dt.hour.between(AKEN[0], AKEN[1] - 1)]                       # ainult kontrollitud kaetusega tunnid
 v = v.assign(paev=v["ts"].dt.normalize(), slot=v["ts"].dt.hour * 4 + v["ts"].dt.minute // 15)

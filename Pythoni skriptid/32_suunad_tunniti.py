@@ -38,20 +38,32 @@ VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/)
       loenduri järgi), must katkendjoon = linna ristmikud kokku, hall joon = 50%. Paremal soojuskaart: rida = ristmik
       (järjestatud tõusu ja mõõna tugevuse järgi), veerg = 15 min; punane = rohkem linna sisse, sinine = rohkem
       välja, hele = tasakaal. Rea lõpus hommiku-õhtu vahe %-punktides.
+  32_01_01_linna_poole_osakaal.png
+      Näitab: 32_01 vasak paneel eraldi: maanteeloendurite ja linna ristmike linna poole osakaal kellaaja järgi.
+  32_01_02_linna_poole_osakaal_kogunenud.png
+      Näitab: nagu 32_01_01, aga must katkendjoon on ristmike kogunenud osakaal: kell 0.00-st kuni selle 15 min pilu
+      lõpuni linna sisse sõitnud / kõik sõidukid (silumata, logija nädala tööpäevad kokku).
+  32_01p_suunad_tunniti.png, 32_01_01p_linna_poole_osakaal.png, 32_01_02p_linna_poole_osakaal_kogunenud.png
+      Näitab: nagu 32_01, 32_01_01 ja 32_01_02, aga must katkendjoon on linna piiriloendurite (common.PIIR_*) summa
+      tavalistel tööpäevadel alates ALGUS_MAANTEE (ristmikul 15 min summa x logija nädala suuna osakaal; maanteel raja
+      suund) ja 32_01p soojuskaardil on ainult piiri ristmikud. Joonise all piiriloendurite nimekiri.
+  32_piir_osakaal.csv       piiriloendurite summa pilu kaupa: sisse, välja, osakaal (60 min silutud), kogunenud osakaal
   32_suunad_tunniti.csv     iga loenduri ja ristmiku osakaal 15 min kaupa (tüüp, nimi, pilu, osakaal, sõidukeid)
   32_tous_moon.csv          ristmik ja maantee: hommikune ja õhtune osakaal, vahe
 """
+import textwrap
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 
-from common import (tervetel_paevadel, maantee_suunad, load_vehicles, load_junctions, day_calendar, set_style, save, save_table,
-                    short_name, slot_label, DIVERGING, TEXT, TEXT2, C_BLUE, C_ORANGE, C_AQUA, C_YELLOW, C_MAGENTA,
+from common import (LOGIJA_NADAL, PIIR_RISTMIKUD, piiri_profiilid, tervetel_paevadel, maantee_suunad, load_vehicles,
+                    load_junctions, day_calendar, set_style, save, save_table,
+                    short_name, DIVERGING, TEXT, TEXT2, C_BLUE, C_ORANGE, C_AQUA, C_YELLOW, C_MAGENTA,
                     C_GREEN, C_VIOLET)
 
 ALGUS_MAANTEE = "2024-08-01"
-NADAL = pd.to_datetime(["2026-10-16", "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"])
+NADAL = LOGIJA_NADAL
 MAANTEED = [("Peterburi tee (Loo)", "0cfcf | narva - tallinn"), ("Tartu mnt", "0f55c | tartu - tallinn"),
             ("Pärnu mnt (Laagri)", "8560b | peoleo - tallinn"), ("Viljandi mnt (Kangru)", "1d86e | rapla - tallinn"),
             ("Paldiski mnt", "1cf12 | paldiski - tallinn"), ("Rannamõisa tee", "36408 | rannamoisa - tallinn"),
@@ -108,7 +120,7 @@ for nimi, s in MAANTEED:
 mt = pd.concat(m_rows, ignore_index=True)
 
 # --- ristmikud (logija nädal) -------------------------------------------------------------------------------------------
-v = load_vehicles(None, koik=True)
+v = load_vehicles(None)
 v = tervetel_paevadel(v[v["ts"].dt.normalize().isin(NADAL)]).copy()      # ristmiku terved päevad
 v["slot"] = v["ts"].dt.hour * 4 + v["ts"].dt.minute // 15
 margis = (v["LSS"] | v["LVS"]).groupby(v["mp_id"]).mean()
@@ -123,7 +135,20 @@ rt = pd.DataFrame({"tyyp": "ristmik", "nimi": [jn.loc[m, "code"] for m in g.inde
                              .reindex(g.index.get_level_values(0)).values})
 linn = g.groupby("slot").sum()
 linn = osakaal(linn["LSS"], linn["LVS"])
+kum = v[v["mp_id"].isin(sobib)].groupby("slot")[["LSS", "LVS"]].sum().reindex(range(96), fill_value=0).cumsum()
+linn_kum = osakaal(kum["LSS"], kum["LVS"])          # ööpäeva algusest selle pilu lõpuni kogunenud sisse / kokku
 save_table(pd.concat([mt, rt], ignore_index=True), "32_suunad_tunniti")
+
+# --- linna piiriloendurid (common.PIIR_*): tavalise tööpäeva profiilide summa ---------------------------------------------
+pp = piiri_profiilid(ALGUS_MAANTEE)
+psis, pval = (pp.xs(s, level="suund").sum().set_axis(range(96)) for s in ("sisse", "välja"))
+piir, piir_kum = osakaal(silu(psis), silu(pval)), osakaal(psis.cumsum(), pval.cumsum())
+PIIR_KOHAD = list(pp.index.get_level_values("koht").unique())
+PIIR_SILT = f"linna piiriloendurid kokku ({len(PIIR_KOHAD)})"
+PIIR_LOEND = textwrap.fill("Piiriloendurid (tavalised tööpäevad, ristmikul suund logija nädala osakaalu järgi): "
+                           + ", ".join(PIIR_KOHAD) + ".", 150)
+save_table(pd.DataFrame({"slot": range(96), "sisse": psis, "valja": pval, "osakaal": piir, "kogunenud": piir_kum})
+           .round(2), "32_piir_osakaal")
 
 hm = rt.pivot(index="nimi", columns="slot", values="osakaal").reindex(columns=range(96))
 tm = pd.DataFrame({"hommik": hm.loc[:, HOMMIK[0]:HOMMIK[1] - 1].mean(axis=1),
@@ -138,42 +163,84 @@ tm["nimi_pikk"] = [f"{k} {short_name(jn.set_index('code').loc[k, 'name'], 26, co
 save_table(tm.rename_axis("kood").reset_index().round(2), "32_tous_moon")
 
 # --- joonis -----------------------------------------------------------------------------------------------------------------
-r_ = tm[tm["tyyp"] == "ristmik"].sort_values("vahe_pp", ascending=False)
-fig, (a1, a2) = plt.subplots(1, 2, figsize=(16, max(7, 0.22 * len(r_) + 1.5)), gridspec_kw={"width_ratios": [1, 1.15]})
-x = np.arange(96) / 4
-for (nimi, _), c in zip(MAANTEED, VARVID):
-    z = mt[mt["nimi"] == nimi]
-    if len(z):
-        a1.plot(z["slot"] / 4, z["osakaal"], color=c, lw=1.8, label=f"{nimi} ({z['paevi'].iloc[0]} p)")
-a1.plot(x, linn.reindex(range(96)).values, color=TEXT, lw=2.2, ls="--", label=f"linna ristmikud kokku ({len(sobib)})")
-a1.axhline(50, color=TEXT2, lw=1)
-a1.set_xlim(KELL[0] / 4, KELL[1] / 4)
-a1.set_xticks(range(4, 25, 2), [f"{h:02d}" for h in range(4, 25, 2)])
-a1.set_ylim(10, 90)
-a1.set_xlabel("kellaaeg")
-a1.set_ylabel("linna poole liikuvate sõidukite osakaal, %")
-a1.set_title("Linna poole osakaal: maanteeloendurid ja ristmikud kokku")
-a1.text(4.2, 88, "rohkem linna sisse", fontsize=8.5, color=TEXT2, va="top")
-a1.text(4.2, 12, "rohkem linnast välja", fontsize=8.5, color=TEXT2, va="bottom")
-a1.legend(loc="lower right", fontsize=8.5)
+def joonista_osakaal(a, pealkiri, joon=None, joone_silt=None, x0=0, **kw):
+    """Joonise vasak paneel: maanteeloendurite ja linna ristmike linna poole osakaal kellaaja järgi. joon = musta
+    katkendjoone väärtused 96 pilu kohta (vaikimisi linn), x0 = joone x-nihe tundides (pilu lõpp = 0,25)."""
+    for (nimi, _), c in zip(MAANTEED, VARVID):
+        z = mt[mt["nimi"] == nimi]
+        if len(z):
+            a.plot(z["slot"] / 4, z["osakaal"], color=c, lw=1.8, label=f"{nimi} ({z['paevi'].iloc[0]} p)")
+    a.plot(np.arange(96) / 4 + x0, (linn if joon is None else joon).reindex(range(96)).values, color=TEXT, lw=2.2,
+           ls="--", label=joone_silt or f"linna ristmikud kokku ({len(sobib)})")
+    a.axhline(50, color=TEXT2, lw=1)
+    a.set_xlim(KELL[0] / 4, KELL[1] / 4)
+    a.set_xticks(range(4, 25, 2), [f"{h:02d}" for h in range(4, 25, 2)])
+    a.set_ylim(10, 90)
+    a.set_xlabel("kellaaeg")
+    a.set_ylabel("linna poole liikuvate sõidukite osakaal, %")
+    a.set_title(pealkiri, **kw)
+    a.text(4.2, 88, "rohkem linna sisse", fontsize=8.5, color=TEXT2, va="top")
+    a.text(4.2, 12, "rohkem linnast välja", fontsize=8.5, color=TEXT2, va="bottom")
+    a.legend(loc="lower right", fontsize=8.5)
 
-h = hm.loc[r_.index, KELL[0]:KELL[1] - 1]
-im = a2.imshow(h.values, aspect="auto", cmap=DIVERGING, vmin=10, vmax=90, interpolation="nearest",
-               extent=(KELL[0] / 4, KELL[1] / 4, len(h) - 0.5, -0.5))
-a2.set_yticks(range(len(h)), r_["nimi_pikk"], fontsize=7.5)
-for i, val in enumerate(r_["vahe_pp"]):
-    a2.text(KELL[1] / 4 + 0.2, i, f"{val:+.0f}", va="center", fontsize=7, color=TEXT2)
-a2.set_xticks(range(4, 25, 2), [f"{h_:02d}" for h_ in range(4, 25, 2)])
-a2.set_xlabel("kellaaeg")
-a2.grid(False)
-a2.set_title(f"Ristmikud: LSS / (LSS + LVS), tööpäevad {NADAL[0]:%d.%m}-{NADAL[-1]:%d.%m.%Y}")
-a2.text(1.0, -0.11, "rea lõpus: hommik (07-09) - õhtu (16-18), %-punkti", transform=a2.transAxes, ha="right",
-        va="top", fontsize=7.5, color=TEXT2)
-cb = fig.colorbar(im, ax=a2, fraction=0.03, pad=0.07)
-cb.set_label("linna poole osakaal, %")
-fig.tight_layout()
-save(fig, "32_01_suunad_tunniti")
+
+def joonis_32_01(read, pealkiri, **kw):
+    """32_01: vasakul joonista_osakaal (kw), paremal ristmike soojuskaart ridadega read."""
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(16, max(7, 0.22 * len(read) + 1.5)), gridspec_kw={"width_ratios": [1, 1.15]})
+    joonista_osakaal(a1, pealkiri, **kw)
+    h = hm.loc[read.index, KELL[0]:KELL[1] - 1]
+    im = a2.imshow(h.values, aspect="auto", cmap=DIVERGING, vmin=10, vmax=90, interpolation="nearest",
+                   extent=(KELL[0] / 4, KELL[1] / 4, len(h) - 0.5, -0.5))
+    a2.set_yticks(range(len(h)), read["nimi_pikk"], fontsize=7.5)
+    for i, val in enumerate(read["vahe_pp"]):
+        a2.text(KELL[1] / 4 + 0.2, i, f"{val:+.0f}", va="center", fontsize=7, color=TEXT2)
+    a2.set_xticks(range(4, 25, 2), [f"{h_:02d}" for h_ in range(4, 25, 2)])
+    a2.set_xlabel("kellaaeg")
+    a2.grid(False)
+    a2.set_title(f"Ristmikud: LSS / (LSS + LVS), tööpäevad {NADAL[0]:%d.%m}-{NADAL[-1]:%d.%m.%Y}")
+    a2.text(1.0, -0.11, "rea lõpus: hommik (07-09) - õhtu (16-18), %-punkti", transform=a2.transAxes, ha="right",
+            va="top", fontsize=7.5, color=TEXT2)
+    cb = fig.colorbar(im, ax=a2, fraction=0.03, pad=0.07)
+    cb.set_label("linna poole osakaal, %")
+    return fig
+
+
+def lopp(fig, nimi, loend=False):
+    """Paigutus ja salvestus; loend=True lisab joonise alla piiriloendurite nimekirja."""
+    if loend:
+        fig.text(0.01, 0.005, PIIR_LOEND, fontsize=7.5, color=TEXT2, va="bottom")
+    fig.tight_layout(rect=(0, 0.05 if loend else 0, 1, 1))
+    save(fig, nimi)
+
+
+r_ = tm[tm["tyyp"] == "ristmik"].sort_values("vahe_pp", ascending=False)
+lopp(joonis_32_01(r_, "Linna poole osakaal: maanteeloendurid ja ristmikud kokku"),
+     "32_01_suunad_tunniti")
+PEALKIRI = (f"Linna poole liikuvate sõidukite osakaal tööpäeviti: maanteeloendurid (alates "
+            f"{pd.Timestamp(ALGUS_MAANTEE):%d.%m.%Y}) ja ")
+fig, a = plt.subplots(figsize=(9, 6.5))
+joonista_osakaal(a, PEALKIRI + f"linna ristmikud ({NADAL[0]:%d.%m}–{NADAL[-1]:%d.%m.%Y})", loc="left", fontweight="bold")
+lopp(fig, "32_01_01_linna_poole_osakaal")
+fig, a = plt.subplots(figsize=(9, 6.5))
+joonista_osakaal(a, PEALKIRI + f"linna ristmikud kogunenult ööpäeva algusest ({NADAL[0]:%d.%m}–{NADAL[-1]:%d.%m.%Y})",
+                 joon=linn_kum, x0=0.25, joone_silt=f"linna ristmikud kokku ({len(sobib)}), kell 0.00-st kogunenud",
+                 loc="left", fontweight="bold")
+lopp(fig, "32_01_02_linna_poole_osakaal_kogunenud")
+
+# piiriloendurite variandid (p): katkendjoon = linna piiri ristlõige, soojuskaardil ainult piiri ristmikud
+piiri_read = r_[r_.index.isin([jn.loc[m, "code"] for m in PIIR_RISTMIKUD])]
+lopp(joonis_32_01(piiri_read, "Linna poole osakaal: maanteeloendurid ja linna piiriloendurid kokku",
+                  joon=piir, joone_silt=PIIR_SILT), "32_01p_suunad_tunniti", loend=True)
+fig, a = plt.subplots(figsize=(9, 7))
+joonista_osakaal(a, PEALKIRI + "linna piiriloendurid kokku", joon=piir, joone_silt=PIIR_SILT, loc="left", fontweight="bold")
+lopp(fig, "32_01_01p_linna_poole_osakaal", loend=True)
+fig, a = plt.subplots(figsize=(9, 7))
+joonista_osakaal(a, PEALKIRI + "linna piiriloendurid kogunenult ööpäeva algusest", joon=piir_kum, x0=0.25,
+                 joone_silt=PIIR_SILT + ", kell 0.00-st kogunenud", loc="left", fontweight="bold")
+lopp(fig, "32_01_02p_linna_poole_osakaal_kogunenud", loend=True)
 
 print(f"maanteeloendureid {mt['nimi'].nunique()}, ristmikke {len(sobib)}; linn kokku hommikul "
       f"{linn.loc[HOMMIK[0]:HOMMIK[1] - 1].mean():.0f}% sisse, õhtul {linn.loc[OHTU[0]:OHTU[1] - 1].mean():.0f}%")
+print(f"piiriloendurid ({len(PIIR_KOHAD)}): hommikul {piir.loc[HOMMIK[0]:HOMMIK[1] - 1].mean():.0f}% sisse, õhtul "
+      f"{piir.loc[OHTU[0]:OHTU[1] - 1].mean():.0f}%; ööpäevas sisse {psis.sum():.0f}, välja {pval.sum():.0f}")
 print(tm.sort_values("vahe_pp").round(1).to_string())

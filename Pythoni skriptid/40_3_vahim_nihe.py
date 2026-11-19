@@ -118,7 +118,7 @@ for i, m in enumerate("AB"):
         ax.axhspan(0, k["koikumine"], color=GRID, alpha=0.55, lw=0, label="päevast päeva kõikumine (ei märka)")
         ax.fill_between(q.index, q[0.25], q[0.75], color=C_ORANGE, alpha=0.15, lw=0, label="ristmikud (kvartiilid)")
         ax.plot(np.r_[0, n["nihe_min"]], np.r_[0, n["tipu_voit"]], color=C_ORANGE, lw=2.4, marker="o", ms=4,
-                label=f"linn: pool varem, pool hiljem")
+                label="linn: pool varem, pool hiljem")
         ax.axhline(k["voit_kadu"], color=C_BLUE, ls="--", lw=1.6, label="kui samad tipptunni autod kaoksid")
         ax.axhline(TAIS_OSA * k["taisvoit"], color=TEXT2, ls=":", lw=1.2)
         if np.isfinite(k["vahim_nihe_min"]):

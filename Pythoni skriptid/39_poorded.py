@@ -3,7 +3,7 @@
 küllastunud ristmikul hommiku- ja õhtutipus.
 
 SISEND
-  common.load_vehicles(None, koik=True)   sõidukipõhised kirjed (tallinn.vehicle_passage): ristmik, kanal, aeg
+  common.load_vehicles(None)   sõidukipõhised kirjed (tallinn.vehicle_passage): ristmik, kanal, aeg
   common.load_manoeuvres()                kanal -> manööver: lähtesuund (from_leg) ja sihtsuund (to_leg)
   common.load_junctions()                 ristmike nimed
 
@@ -34,16 +34,15 @@ VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/)
 """
 import re
 
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.path import Path
 from matplotlib.patches import PathPatch, Rectangle
 
-from common import (tervetel_paevadel, load_vehicles, load_manoeuvres, load_junctions, set_style, save, save_table, short_name, C_BLUE,
-                    C_ORANGE, C_AQUA, C_VIOLET, C_MAGENTA, C_GRAY, TEXT, TEXT2)
+from common import (LOGIJA_NADAL, tanavanimi, tervetel_paevadel, load_vehicles, load_manoeuvres, load_junctions, set_style, save, save_table, short_name, C_BLUE,
+                    C_ORANGE, C_AQUA, C_VIOLET, C_MAGENTA, C_GRAY, TEXT)
 
-NADAL = pd.to_datetime(["2026-10-16", "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"])
+NADAL = LOGIJA_NADAL
 TIPUD = {"hommik 07-09": (7, 9), "õhtu 16-18": (16, 18)}
 RISTMIKUD = [1, 8, 19, 13]
 VARVID = [C_BLUE, C_ORANGE, C_AQUA, C_VIOLET, C_MAGENTA]       # harud nime järjekorras
@@ -53,7 +52,7 @@ tuh = lambda x: f"{x:,.0f}".replace(",", " ")                  # tuhandete erald
 
 def haru(nimi):
     """'1 Tammsaare, Mustamäe side (W)' -> 'Tammsaare, Mustamäe pool (W)'."""
-    return re.sub(r"^\d+\s+", "", str(nimi)).replace(" side", " pool").strip()
+    return tanavanimi(re.sub(r"^\d+\s+", "", str(nimi)).replace(" side", " pool").strip())      # Tartu/Pärnu -> ... mnt
 
 
 def virn(vood, jarjekord):
@@ -85,7 +84,7 @@ dm = load_manoeuvres()
 dm["mp_id"] = dm["mp"].str[2:].astype(int)
 dm = dm[dm["mp_id"].isin(RISTMIKUD)].dropna(subset=["from_leg", "to_leg"])
 dm["lahe"], dm["siht"] = dm["from_leg"].map(haru), dm["to_leg"].map(haru)
-v = load_vehicles(None, koik=True)
+v = load_vehicles(None)
 v = v[v["mp_id"].isin(RISTMIKUD) & v["ts"].dt.normalize().isin(NADAL)]
 paevi = v["ts"].dt.normalize().nunique()
 rows = []

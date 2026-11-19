@@ -7,6 +7,8 @@ SISEND
                            päevasummad iga loenduri iga kanali (sõiduraja) kohta: tunniridade arv päevas (hours) ning
                            sõidukid 10 sõidukiklassi ja 11 kiirusvahemiku kaupa
   common.load_locations()  loendurite nimed, maakonnad ja teenumbrid (highway.counter)
+  common.load_tallinn()    Tallinna ristmike 15 min loendused ja puhastatud päevad (kehtiv: puudu kuni 2 h ja
+                           päevasumma ei lange linna ülejäänud ristmikega võrreldes, vt common.load_tallinn)
 
 ARVUTUS
   1) Tunniridade arv ööpäevas. Iga kanal-päev liigitatakse tunniridade arvu järgi: <= 22 = osaline päev,
@@ -19,6 +21,8 @@ ARVUTUS
      common.load_daily) ja sõidukeid on üle nulli. Kanal-kuu kehtib, kui kehtivaid päevi on >= 15. Loendur-kuu
      kehtib, kui kehtivate kanalite arv ei ole väiksem loenduri tavalisest kanalite arvust (ühe raja väljalangemine
      ei tohi paista liikluse langusena). Iga kuu kohta loetakse kehtivate loendurite arv.
+  3b) Tallinna ristmikud: ristmiku-kuu kehtib, kui kehtivaid ristmiku-päevi (common.load_tallinn) on >= 15. Kuud, kus
+     andmeperioodi päevi on alla 15 (07.2024 ja 10.2026), jäävad välja.
   4) Kahtlased loendur-kuud: maht erineb sama loenduri sama kalendrikuu mediaanist üle 1,75 korra või alla
      0,4 korra (common.volume_anomaly) või mõne sõidukiklassi osakaal erineb loenduri enda mediaanist üle
      25 protsendipunkti (common.class_anomaly).
@@ -45,8 +49,14 @@ VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/)
       Punane = osaline päev, sinine = täispäev, oranž = topelt imporditud, hall = muud.
   01_02_loendurid_kuus.png
       Näitab: mitu loendurit annab igas kuus kasutatavaid andmeid (arvutus 3).
-      Kuidas: joondiagramm; x-telg = aeg (märgid aastate kaupa), y-telg = kehtivate loendurite arv (algab nullist);
-      kahtlase mahuga loendur-kuud (arvutus 4) ei ole loetud.
+      Kuidas: joondiagramm; x-telg = aeg (märgid aastate kaupa), y-telg = loendurite arv (algab nullist). Sinine =
+      kehtivad loendurid, kahtlase mahuga loendur-kuud (arvutus 4) ei ole loetud; hall katkendjoon = loendurid, millel
+      on selles kuus vähemalt üks tunnirida (suurim võimalik arv). Enamiku loendurite tunniandmed algavad
+      andmebaasis 07-10.2020, kuigi loendurid on paigaldatud 2006-2010.
+  01_04_ristmikud_kuus.png
+      Näitab: mitu Tallinna ristmikku annab igas kuus kasutatavaid andmeid (arvutus 3b).
+      Kuidas: joondiagramm nagu 01_02; sinine = kehtivad ristmikud, hall katkendjoon = ristmikud, millel on selles
+      kuus andmeid (suurim võimalik arv).
   01_03_kaetus_heatmap.png
       Näitab: millistel kuudel on iga loenduri andmed kasutatavad.
       Kuidas: ruudustik; rida = loendur (silt "maakond · nimi", järjestatud maakonna ja teenumbri järgi), veerg = kuu
@@ -61,8 +71,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from common import (load_daily, load_locations, counter_month, set_style, save, save_table,
-                    CLASS_COLS, SPEED_COLS, C_BLUE, C_ORANGE, C_AQUA, C_RED, C_GRAY, TEXT2,
+from common import (load_daily, load_locations, load_tallinn, counter_month, set_style, save, save_table,
+                    CLASS_COLS, SPEED_COLS, C_BLUE, C_ORANGE, C_RED, C_GRAY,
                     START, END, month_axis)
 
 set_style()
@@ -103,14 +113,34 @@ mismatch_rel = np.abs(tot_c - tot_s).sum() / tot_c.sum() * 100
 cm = counter_month(d)
 cm = cm.merge(loc[["id", "maakond", "nimi", "tee_nr"]], on="id", how="left")
 n_month = cm[~cm["maht_kahtlane"]].groupby("kuu")["id"].nunique()        # kahtlase mahuga kuud ei ole kasutatavad
+n_andmed = d.groupby(d["paev"].dt.to_period("M"))["id"].nunique().loc[START:END]   # suurim võimalik: kuus andmeid saatnud
 
 fig, ax = plt.subplots(figsize=(9, 3.8))
-ax.plot(n_month.index.to_timestamp(), n_month.values, color=C_BLUE)
+ax.plot(n_andmed.index.to_timestamp(), n_andmed.values, color=C_GRAY, lw=1.2, ls="--", label="andmetega loendureid")
+ax.plot(n_month.index.to_timestamp(), n_month.values, color=C_BLUE, label="kehtivaid loendureid")
 ax.set_ylim(0, None)
 ax.set_ylabel("Loendureid")
-ax.set_title("Kehtivate loendurite arv kuus (≥15 täispäeva, kõik suunad, kahtlase mahuga kuud välja)")
+ax.legend(fontsize=9, loc="lower right")
+ax.set_title("Kehtivate maanteeloendurite arv kuus (≥15 täispäeva kuus)")
 month_axis(ax)
 save(fig, "01_02_loendurid_kuus")
+
+# 3b) Tallinna ristmikud kuus (common.load_tallinn: päev kehtib, kui puudu on kuni 2 h ja päevasumma ei lange linnaga
+# võrreldes); servakuud, kus andmeperioodi päevi on alla 15, jäävad välja (muidu langeks joon seal nulli)
+_, tp = load_tallinn()
+tkuu = tp["paev"].dt.to_period("M")
+tais = tp.groupby(tkuu)["paev"].nunique().loc[lambda x: x >= 15].index
+t_andmed = tp.groupby(tkuu)["mp_id"].nunique().reindex(tais)
+t_kehtiv = (tp[tp["kehtiv"]].groupby([tkuu, "mp_id"]).size() >= 15).groupby(level=0).sum().reindex(tais, fill_value=0)
+fig, ax = plt.subplots(figsize=(9, 3.8))
+ax.plot(tais.to_timestamp(), t_andmed.values, color=C_GRAY, lw=1.2, ls="--", label="andmetega ristmikke", zorder=3)
+ax.plot(tais.to_timestamp(), t_kehtiv.values, color=C_BLUE, label="kehtivaid ristmikke")
+ax.set_ylim(0, t_andmed.max() + 5)
+ax.set_ylabel("Ristmikke")
+ax.legend(fontsize=9, loc="lower right")
+ax.set_title("Kehtivate Tallinna ristmike arv kuus (≥15 täispäeva kuus)")
+month_axis(ax)
+save(fig, "01_04_ristmikud_kuus")
 
 # 4) Heatmap: loendur x kuu -------------------------------------------------------
 months = pd.period_range(START, END, freq="M")
@@ -129,7 +159,7 @@ xt = [i for i, m in enumerate(months) if m.month == 1]
 ax.set_xticks(xt)
 ax.set_xticklabels([months[i].year for i in xt])
 ax.grid(False)
-ax.set_title("Loendurite kehtivad kuud (sinine = kasutatav, oranž = kahtlane maht, välja jäetud)")
+ax.set_title("Kehtivad loendur-kuud (oranž = maht üle 1,75 või alla 0,4 korra tavalisest)")
 save(fig, "01_03_kaetus_heatmap")
 
 # 5) Tabelid -----------------------------------------------------------------------
@@ -161,10 +191,14 @@ summary = pd.DataFrame([
     ("Liigi- ja kiirussumma erinevad, % ridadest", mismatch_share),
     ("Liigi- ja kiirussumma erinevus, % sõidukitest", mismatch_rel),
     ("Loendur-kuid kokku", len(cm)),
-    ("Kahtlane maht (välja jäetud)", int(cm["maht_kahtlane"].sum())),
-    ("Kahtlane klassijaotus (välja klassianalüüsist)", int(cm["klass_kahtlane"].sum())),
+    ("Maht üle 1,75 või alla 0,4 korra tavalisest (välja jäetud)", int(cm["maht_kahtlane"].sum())),
+    ("Klassijaotus tavalisest erinev (välja klassianalüüsist)", int(cm["klass_kahtlane"].sum())),
     ("Kehtivaid loendureid kuus, min", n_month.min()),
     ("Kehtivaid loendureid kuus, max", n_month.max()),
+    ("Tallinna ristmikke andmetes", tp["mp_id"].nunique()),
+    ("Tallinna kehtivaid ristmikke kuus, min ... max", f"{t_kehtiv.min()} ... {t_kehtiv.max()}"),
+    ("Tallinna kehtivaid ristmiku-päevi, %", tp["kehtiv"].mean() * 100),
+    ("Tallinna andmeperiood", f"{tp['paev'].min():%d.%m.%Y} ... {tp['paev'].max():%d.%m.%Y}"),
     ("Analüüsiaken", f"{START} ... {END}"),
 ], columns=["näitaja", "väärtus"])
 save_table(summary, "01_kvaliteet_kokkuvote")

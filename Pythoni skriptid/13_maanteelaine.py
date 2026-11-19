@@ -22,19 +22,21 @@ SISEND (loeb common.maantee_suunad(), sama ettevalmistus on ka skriptis 20)
 A) PENDELRÄNDE LAINE (tavaliste tööpäevade profiil)
     laine         = hommiku (06-10) osakaal ööpäevast - õhtu (15-19) osakaal; sissesuund = loenduri kahest suunast see,
                     mille laine on suurem (hommikul linna poole, õhtul tagasi)
-    asümmeetria   = sissesuuna laine - väljasuuna laine. Pendelrände ala = kaugus lähimast linnast (Tallinn, Tartu,
-                    Pärnu; linnulennult), milleni 10 km vööndi mediaanasümmeetria on >= 0,10 (">=" = laine ei kao enne
+    asümmeetria   = sissesuuna laine - väljasuuna laine. Pendelrände ala = kaugus Tallinna keskusest (linnulennult;
+                    loendur kuulub Tallinnale, kui see on Tallinnale lähemal kui Tartule või Pärnule), milleni 10 km vööndi mediaanasümmeetria on >= 0,10 (">=" = laine ei kao enne
                     andmete serva)
     laine kiirus  = sissesuuna hommikuse liikluse keskaeg (05-10) ja väljasuuna õhtuse keskaeg (14-20) kauguse järgi
                     (Tallinna pendelrände ala loendurid; sirge tõus min/km)
   13_01_pendellaine.png
       Näitab: kui kaugele linnast pendelränne ulatub ja kui kiiresti hommikune ja õhtune laine liigub.
-      Kuidas: 2 x 2 paneeli. Ülal vasakul hajuvusdiagramm: punkt = loendur, x = kaugus lähimast linnast, km, y =
-      asümmeetria; värv = linn (sinine Tallinn, oranž Tartu, türkiis Pärnu), suurus = liiklus, katkendjoon =
+      Kuidas: 2 x 2 paneeli. Ülal vasakul hajuvusdiagramm: punkt = loendur, x = kaugus Tallinna keskusest, km, y =
+      asümmeetria (ainult Tallinna loendurid), suurus = liiklus, katkendjoon =
       pendelrände tunnus 0,10. Ülal paremal kaart ortofototaustal: ring = loendur, värv = asümmeetria (kollasest
       punaseni, 0-0,4). All vasakul hommik, Tallinna poole: x = kaugus Tallinnast, y = liikluse keskaeg 05-10; all
       paremal õhtu, Tallinnast välja: keskaeg 14-20. Katkendjoon = sirge sobitus; pealkirjas tõus min/km, r ja
       loendurite arv; nimega on märgitud kuus kaugeimat loendurit.
+  13_01b_hommikulaine.png
+      Näitab: 13_01 alumine vasak paneel eraldi: hommikune liikluse keskaeg Tallinna poole kauguse järgi ja laine kiirus.
   13_pendellaine.csv   loenduri suuna kaupa: linn, kaugus, päevi, sissesuund, asümmeetria, osakaalud, keskajad
 
 B) NÄDALALÕPU LAINE Tallinnast algavatel põhimaanteedel 1, 2 ja 4
@@ -54,11 +56,14 @@ C) AEGLANE LIIKLUS JA SEISAK TALLINNA LÄHEDAL (loenduri suunad kuni AEGLUS_KM =
   Loendur annab iga veerandtunni kohta sõidukite arvu kiirusvahemike kaupa (väikseim vahemik on "alla 40 km/h", seega
   päris seisakut ja 30 km/h roomamist ei saa eristada). Suuna rajad on liidetud.
     keskmine kiirus     = kiirusvahemike keskpunktide kaalutud keskmine; hinnatakse, kui veerandtunnis on >= 20 sõidukit
-    tavakiirus          = loenduri suuna veerandtundide mediaankiirus kell 06-20
-    aeglane             = keskmine kiirus <= 70% tavakiirusest (sama lävi kui 09 vaba voolu ummikul)
-    seisakulähedane     = vähemalt pool sõidukitest sõidab alla 40 km/h
+    tavakiirus          = vaba kiirus: keskmine kiirus kell 06-20 veerandtundidel, kus vool on kuni 30% loenduri suuna
+                          veerandtundide 99. protsentiilist (HCM 2000 lk 21-3: teenindustasemel A on kiirus = vaba kiirus)
+    aeglane             = keskmine kiirus <= 70% vabast kiirusest (nagu 09 vaba voolu ummikul: kiirus läbilaskevõimel
+                          on 72-97% vabast kiirusest, HCM 2000 lk 13-4 ja 21-3)
+    seisakulähedane     = vähemalt pool sõidukitest sõidab alla 40 km/h ehk mediaankiirus on alla järjekorrast väljuva
+                          voo kiiruse (55 km/h kuni vaba kiirus, HCM 2000 lk 13-3): ülekoormatud voog
     aeglane lõik        = järjestikused aeglased või seisakulähedased veerandtunnid (üks vahele jääv loetakse sisse),
-                          arvesse alates 30 minutist
+                          arvesse alates ühest veerandtunnist (HCM-i analüüsiperiood 15 min, lk 2-3)
     vool %              = lõigu keskmine vool / loenduri tavalise tööpäeva suurim veerandtund (mediaanprofiili tipp):
                           alla 100% = läbi pääseb vähem kui tavalisel tipul, kuigi nõudlus on suur
   Päev jääb välja, kui selle maht on alla 0,4 või üle 1,75 korra tavalisest (rikked; teetööde ajal ühele sõidusuunale
@@ -72,6 +77,8 @@ C) AEGLANE LIIKLUS JA SEISAK TALLINNA LÄHEDAL (loenduri suunad kuni AEGLUS_KM =
       sel ajal aeglane (tumedam = sagedamini). All kuni neli näidet, tüüpiline tööpäev: sinine = vool,
       sõidukit tunnis (mediaan, vasak telg); oranž = kiirus (mediaan, parem telg), oranž katkendjoon = aeglaseim 10%
       päevi; punane vöönd = kellaaeg, mil liiklus on aeglane vähemalt 25% päevadest.
+  13_03b_aeglaseim.png
+      Näitab: 13_03 esimene näide eraldi (kõige sagedamini aeglane suund): sagedus, kiirus ja aeglane vöönd.
   13_aeglus.csv          loenduri suuna kokkuvõte: aeglaste ja seisakulähedaste päevade arv ja osakaal, tavaline algus,
                          kestus, kiirus, vool % tavalisest tipust
   13_aeglus_loigud.csv   iga aeglane lõik: päev, algus, lõpp, kestus, kiirus, aeglaseim veerandtund, alla 40 km/h osakaal
@@ -83,7 +90,7 @@ D) EELHOIATUS
   tavalised tööpäevad ummikupäevadest kuni 4 nädalat tagasi). Kui samu tööpäevi on >= 3: kas päeval, mil maantee täitub
   varem, algab ka ummik varem (kõrvalekalded mediaanist, Spearmani rho).
   13_04_eelhoiatus.png
-      Näitab: mitu minutit enne ristmiku ummiku algust on maantee linna piiril juba täitunud.
+      Näitab: mitu minutit enne ristmiku ummiku algust on maantee kuni 25 km Tallinnast juba täitunud.
       Kuidas: rida = piiriloendur (sildis tõusuaeg ja manöövrite arv, järjestatud edumaa järgi), x-telg = edumaa, min.
       Sinine punkt = ristmiku manööver, oranž kriips = loenduri mediaan, püstjoon = 0. Kui samu tööpäevi on >= 3,
       lisandub paremale hajuvusdiagramm: x = maantee täitumine tavalisest varem (-) või hiljem (+), min, y = ummiku
@@ -100,8 +107,10 @@ CALCULATION IN PLAIN ENGLISH
   B) Weekend wave: Friday outbound volume 12-21 and Sunday inbound volume 12-24 / Monday-Thursday average at the same
      clock time; traffic midpoint 12-24.
   C) Slow traffic: mean speed = sum of (vehicles x band middle) / vehicles, when a quarter hour has at least 20
-     vehicles; usual speed = median 06-20; slow = mean speed <= 70% of usual; near standstill = at least half the
-     vehicles below 40 km/h; flow % = average flow of the slow stretch / the direction's usual busiest quarter hour
+     vehicles; free speed = mean speed 06-20 in quarter hours with flow up to 30% of the direction's 99th percentile
+     (HCM level of service A); slow = mean speed <= 70% of free speed (below the speed at capacity, HCM 2000);
+     near standstill = at least half the vehicles below 40 km/h (below queue discharge speeds, HCM 2000); stretches
+     from one quarter hour (the HCM analysis period); flow % = average flow of the slow stretch / the direction's usual busiest quarter hour
      x 100. Days with volume below 0.4 or above 1.75 x usual are dropped.
   D) Early warning: highway rise time = clock time when flow passes 80% of the direction's usual morning (05-09) top
      quarter hour (straight line between quarters). Lead = junction congestion start (09) - rise time (medians over
@@ -115,12 +124,12 @@ import matplotlib.pyplot as plt
 from scipy import stats
 
 from common import (maantee_suunad, load_junctions, km, add_basemap, to_merc, slot_label, set_style, save, save_table,
-                    OUT_DIR, loigud, suunad_korvuti, C_BLUE, C_ORANGE, C_AQUA, C_RED, TEXT2)
+                    OUT_DIR, loigud, suunad_korvuti, KIIRUS_YLE, X_VABA, C_BLUE, C_ORANGE, C_RED, TEXT2)
 
 ALGUS = "2025-09-01"      # profiilide periood: viimane õppeaasta kuni andmete lõpuni
 MIN_PAEVI = 20            # profiil arvesse, kui loenduri suunal on vähemalt nii palju päevi
 LINNAD = {"Tallinn": (59.4372, 24.7454), "Tartu": (58.3806, 26.7225), "Pärnu": (58.3859, 24.4971)}
-LINNA_VARV = {"Tallinn": C_BLUE, "Tartu": C_ORANGE, "Pärnu": C_AQUA}
+LINNA_VARV = {"Tallinn": C_BLUE}    # joonisel ainult Tallinn; Tartu ja Pärnu on LINNAD-is, et nende loendurid Tallinna alla ei satuks
 TALLINN = ("tallinn", "talinn")      # Tallinna kirjapildid radade nimedes
 ASYM_PIIR = 0.10          # pendelrände tunnus (osakaalude vahe)
 KATVUS = 0.9              # profiil arvesse, kui vähemalt 90% veerandtundidest on olemas
@@ -129,10 +138,10 @@ PIIR_KM = 25              # eelhoiatus: sissesuuna loendurid kuni 25 km Tallinna
 HOMMIK = (5, 9)           # maantee hommikuse tõusu aken
 TOUS = 0.8                # tõusuaeg: vool ületab 80% tavalisest hommikusest suurimast veerandtunnist
 AEGLUS_KM = 35            # aeglane liiklus: loendurid kuni 35 km Tallinna keskusest
-AEGLUS = 0.7              # aeglane veerandtund: keskmine kiirus <= 70% loenduri tavakiirusest (nagu 09 vaba vool)
-SEISAK_OSA = 0.5          # seisakulähedane veerandtund: vähemalt pool sõidukitest alla 40 km/h (väikseim kiirusvahemik)
+AEGLUS = KIIRUS_YLE       # aeglane veerandtund: keskmine kiirus <= 70% vabast kiirusest (alla kiiruse läbilaskevõimel, HCM)
+SEISAK_OSA = 0.5          # seisakulähedane: mediaankiirus alla 40 km/h, alla järjekorrast väljuva voo 55 km/h (HCM lk 13-3)
 MIN_SOID = 20             # kiirust hinnatakse, kui veerandtunnis on vähemalt 20 sõidukit
-MIN_VEERANDEID = 2        # aeglane lõik arvesse alates 30 minutist
+MIN_VEERANDEID = 1        # aeglane lõik arvesse alates HCM-i analüüsiperioodist 15 min (HCM 2000 lk 2-3)
 MAHT_OK = (0.4, 1.75)     # päev arvesse, kui päeva maht on 0,4...1,75 x tavaline (ümbersuunamised ja rikked välja)
 H = (np.arange(96) + 0.5) / 4
 hhmm = lambda h: slot_label(h * 60, 60)
@@ -185,6 +194,7 @@ k = ds.join(pd.DataFrame({"soidukeid": T.sum(axis=1), "hommik": osa(T, 6, 10), "
                           "paevi": dq[dq["toopaev"]].groupby("site")["paev"].nunique()}), how="inner")
 k["koht"] = k["id"]
 k["laine"] = k["hommik"] - k["ohtu"]
+k = k[k["laine"].notna()]                                                  # suund ilma täisprofiilita (rikkis rajad) välja
 k = k[k.groupby("koht")["laine"].transform("size") == 2].copy()            # ainult mõlema suunaga loendurid
 k["sisse"] = k.index.isin(k.groupby("koht")["laine"].idxmax())
 k["asym"] = k["koht"].map(k[k["sisse"]].set_index("koht")["laine"] - k[~k["sisse"]].set_index("koht")["laine"])
@@ -216,7 +226,7 @@ for linn, col in LINNA_VARV.items():
                    label=f"{linn} ({len(g)} loendurit; pendelrände ala {ala[linn]} km)")
 ax.axhline(ASYM_PIIR, color=TEXT2, lw=0.8, ls="--")
 ax.set_ylim(0, None)
-ax.set_xlabel("Kaugus lähimast linnast, km (linnulennult)")
+ax.set_xlabel("Kaugus Tallinna keskusest, km (linnulennult)")
 ax.set_ylabel("Suundade asümmeetria (hommiku ja õhtu osakaalu vahe)")
 ax.set_title("Pendelrände ulatus: kui kaugel on hommikul selge linna-suunaline ülekaal\n(punkti suurus = liiklus; "
              "katkendjoon = pendelrände tunnus)", fontsize=10)
@@ -229,8 +239,8 @@ sc = ax.scatter(px, py, c=s_in["asym"], cmap="YlOrRd", vmin=0, vmax=0.4, s=np.sq
                 edgecolor="black", linewidth=0.6, zorder=5)
 fig.colorbar(sc, ax=ax, shrink=0.7, label="Asümmeetria")
 ax.set_title("Kus on pendelrände laine tugev", fontsize=10)
-for ax, g, veerg, (b, a, r, n), nimi in [(axes[1, 0], tl, "hommik_kesk_h", laine_h, "Hommik, Tallinna poole: liikluse keskaeg 05–10"),
-                                         (axes[1, 1], tv, "ohtu_kesk_h", laine_o, "Õhtu, Tallinnast välja: liikluse keskaeg 14–20")]:
+def laine(ax, g, veerg, fit, nimi):
+    b, a, r, n = fit
     ax.scatter(g["km_linnast"], g[veerg], s=np.sqrt(g["soidukeid"]) * 0.7, color=C_BLUE if "hommik" in veerg else C_ORANGE,
                alpha=0.8, edgecolor="none")
     if n >= 4:
@@ -243,10 +253,19 @@ for ax, g, veerg, (b, a, r, n), nimi in [(axes[1, 0], tl, "hommik_kesk_h", laine
     ax.set_xlabel("Kaugus Tallinnast, km (linnulennult)")
     ax.set_ylabel("Liikluse keskaeg")
     ax.set_title(f"{nimi}\n{b:+.2f} min/km (r = {r:.2f}, {n} loendurit pendelrände alal)", fontsize=10)
+for ax, g, veerg, fit, nimi in [(axes[1, 0], tl, "hommik_kesk_h", laine_h, "Hommik, Tallinna poole: liikluse keskaeg 05–10"),
+                                (axes[1, 1], tv, "ohtu_kesk_h", laine_o, "Õhtu, Tallinnast välja: liikluse keskaeg 14–20")]:
+    laine(ax, g, veerg, fit, nimi)
 fig.suptitle(f"Pendelrände laine maanteedel (15 min loendused, {TP} tavalist tööpäeva alates {pd.Timestamp(ALGUS):%d.%m.%Y})",
              x=0.01, ha="left", fontweight="bold")
 fig.tight_layout()
 save(fig, "13_01_pendellaine")
+fig, ax = plt.subplots(figsize=(9, 5.5))                          # 13_01b: hommikune laine eraldi
+laine(ax, tl, "hommik_kesk_h", laine_h, "Hommik, Tallinna poole: liikluse keskaeg 05–10")
+ax.set_title(f"Hommik, Tallinna poole: liikluse keskaeg 05–10\n{laine_h[0]:+.2f} min/km (r = {laine_h[2]:.2f}, "
+             f"{laine_h[3]} loendurit pendelrände alal), laine liigub ~{60 / abs(laine_h[0]):.0f} km/h", fontsize=10)
+fig.tight_layout()
+save(fig, "13_01b_hommikulaine")
 
 # === B) Nädalalõpu laine radiaalteedel ====================================================================
 R = ds[ds["tee_nr"].isin(RADIAALTEED) & (ds["tee_suund"] != "")]
@@ -302,7 +321,9 @@ suhe = suhe["c"] / suhe["tava"]
 A = A[pd.MultiIndex.from_frame(A[["site", "paev"]]).isin(suhe.index[suhe.between(*MAHT_OK)])].copy()
 A["kiirus"] = A["ks"] / A["kn"].where(A["kn"] >= MIN_SOID)
 A["alla40_osa"] = A["alla40"] / A["kn"].where(A["kn"] >= MIN_SOID)
-A["tavakiirus"] = A["site"].map(A[A["slot"].between(24, 79)].groupby("site")["kiirus"].median())     # kell 06-20
+paev_ = A[A["slot"].between(24, 79)]                                                # kell 06-20
+vaba = paev_["c"] <= X_VABA * (paev_["c"].groupby(paev_["site"]).transform("quantile", 0.99))   # teenindustase A (HCM)
+A["tavakiirus"] = A["site"].map(paev_[vaba].groupby("site")["kiirus"].mean())     # vaba kiirus
 A["aeglane"] = A["kiirus"] <= AEGLUS * A["tavakiirus"]
 A["seisak"] = A["alla40_osa"] >= SEISAK_OSA
 A["lipp"] = A["aeglane"] | A["seisak"]
@@ -320,7 +341,7 @@ for (site, paev), g in A[A.groupby(["site", "paev"])["lipp"].transform("any")].g
                              vool_pct=x["c"].mean() / tipuvool[site] * 100))
 al = pd.DataFrame(rows)
 if al.empty:
-    print("C) Aeglane liiklus: ühtegi vähemalt 30 min aeglast lõiku ei leitud.")
+    print("C) Aeglane liiklus: ühtegi aeglast veerandtundi ei leitud.")
 else:
     al = al.join(ds[["nimi", "tee_nr", "km_linnast", "lahte", "siht"]], on="site")
     al["tipuajal"] = al["algus_h"].between(6, 10) | al["algus_h"].between(15, 19)
@@ -328,7 +349,7 @@ else:
     paevi = A.groupby("site")["paev"].nunique()
     ak = (al.groupby("site").agg(nimi=("nimi", "first"), tee_nr=("tee_nr", "first"), km_linnast=("km_linnast", "first"),
                                  lahte=("lahte", "first"), siht=("siht", "first"), tavakiirus=("tavakiirus", "first"),
-                                 aeglaseid_paevi=("paev", "nunique"), seisakupaevi=("paev", lambda s: s[al.loc[s.index, "seisak_min"] >= 30].nunique()),
+                                 aeglaseid_paevi=("paev", "nunique"), seisakupaevi=("paev", lambda s: s[al.loc[s.index, "seisak_min"] >= 15].nunique()),
                                  algus_mediaan_h=("algus_h", "median"), kestus_mediaan_min=("kestus_min", "median"),
                                  pikim_min=("kestus_min", "max"), kiirus_mediaan=("kiirus", "median"), vool_pct=("vool_pct", "median"),
                                  tipuajal_pct=("tipuajal", lambda s: s.mean() * 100))
@@ -340,7 +361,7 @@ else:
     korduv = korduv.loc[suunad_korvuti(korduv.join(ds[["id", "tee_suund"]]).assign(v=-korduv["osa_paevadest_pct"]),
                                        "id", "tee_suund", "v")]           # sama loenduri suunad järjest
     print(f"C) Aeglane liiklus ({A['site'].nunique()} loenduri suunda kuni {AEGLUS_KM} km Tallinnast, {A['paev'].nunique()} tööpäeva): "
-          f"{len(al)} lõiku >= 30 min {al['site'].nunique()} suunal; vähemalt 5 päeval {len(korduv)} suunal")
+          f"{len(al)} lõiku >= {MIN_VEERANDEID * 15} min {al['site'].nunique()} suunal; vähemalt 5 päeval {len(korduv)} suunal")
     for s, r in korduv.head(6).iterrows():
         print(f"   {silt(s)}: {r.aeglaseid_paevi} päeval {r.toopaevi}-st ({r.osa_paevadest_pct:.0f}%), seisakulähedane {r.seisakupaevi} päeval; "
               f"algus tavaliselt {hhmm(r.algus_mediaan_h)}, kestus {r.kestus_mediaan_min:.0f} min (pikim {r.pikim_min:.0f}), kiirus "
@@ -361,8 +382,7 @@ else:
         ax.set_title(f"Mitmel % tööpäevadest on liiklus sel kellaajal aeglane (kiirus <= {AEGLUS:.0%} tavalisest või vähemalt pool "
                      "sõidukitest alla 40 km/h); rea lõpus aeglaste päevade arv", fontsize=10)
         fig.colorbar(im, ax=ax, shrink=0.8, pad=0.01, label="% tööpäevadest")
-        for i, s in enumerate(naited):
-            ax = fig.add_subplot(gs[1, i])
+        def naide(ax, s, vasak=True, parem=True):
             g = A[A["site"] == s].groupby("slot")
             x = (np.arange(96) + 0.5) / 4
             for a, b in loigud((g["lipp"].mean().reindex(range(96), fill_value=0) >= 0.25).values, 0):
@@ -377,16 +397,24 @@ else:
             ax2.plot(x, g["kiirus"].quantile(0.1).reindex(range(96)), color=C_ORANGE, lw=0.8, ls="--")
             ax2.set_ylim(0, None)
             ax2.grid(False)
-            if i == 0:
-                ax.set_ylabel("Vool, sõidukit tunnis (mediaan)")
-            if i == len(naited) - 1:
+            if vasak:
+                ax.set_ylabel("Sagedus, sõidukit tunnis (mediaan)")
+            if parem:
                 ax2.set_ylabel("Kiirus, km/h (mediaan)", color=C_ORANGE)
             ax.set_title(silt(s).replace("): ", "):\n"), fontsize=9)
-        fig.supxlabel("All: tüüpiline tööpäev - sinine = vool, oranž = kiirus (katkendjoon = aeglaseim 10% päevi), punane vöönd = aeglane "
+        for i, s in enumerate(naited):
+            naide(fig.add_subplot(gs[1, i]), s, i == 0, i == len(naited) - 1)
+        fig.supxlabel("All: tüüpiline tööpäev - sinine = sagedus, oranž = kiirus (katkendjoon = aeglaseim 10% päevi), punane vöönd = aeglane "
                       "vähemalt 25% päevadest", fontsize=9, color=TEXT2)
         fig.suptitle(f"Aeglane liiklus ja seisak maanteel Tallinna lähedal (kuni {AEGLUS_KM} km, tööpäevad alates "
                      f"{pd.Timestamp(ALGUS):%d.%m.%Y})", x=0.01, ha="left", fontweight="bold")
         save(fig, "13_03_aeglus")
+        fig, ax = plt.subplots(figsize=(9, 5))                    # 13_03b: kõige sagedamini aeglane suund eraldi
+        naide(ax, naited[0])
+        ax.set_title(silt(naited[0]) + " - tüüpiline tööpäev\nsinine = sagedus, oranž = kiirus (katkendjoon = aeglaseim "
+                     "10% päevi), punane vöönd = aeglane vähemalt 25% päevadest", fontsize=10, loc="left")
+        fig.tight_layout()
+        save(fig, "13_03b_aeglaseim")
 
 # === D) Eelhoiatus: piiriloenduri tõusuaeg vs ristmike ummiku algus ===========================================
 if not (OUT_DIR / "09_ummikud.csv").exists():

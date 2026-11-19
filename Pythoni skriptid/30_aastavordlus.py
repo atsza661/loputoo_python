@@ -5,8 +5,8 @@ SISEND
   common.load_tallinn()      ristmike 15 min loendused puhastatult ja päevasummad (tallinn.count_15min)
 
 ARVUTUS
-  Võrreldavad perioodid (PERIOODID): septembri 2. nädalast 4 õppetöö nädalat, E-R, mitte püha - 08.09.-03.10.2025 ja
-    07.09.-02.10.2026 (sama nädalapäevade arv, mõlemad õppetöö ajal).
+  Võrreldavad perioodid (PERIOODID): septembri 2. nädalast 6 õppetöö nädalat, E-R, mitte püha - 08.09.-17.10.2025 ja
+    07.09.-16.10.2026 (sama nädalapäevade arv, mõlemad õppetöö ajal; 2025. a sügisvaheaeg algas 20.10).
   Ristmiku näitajad perioodis (tööpäevade mediaan, ainult kehtivad päevad, vähemalt MIN_PAEVI päeva):
     ööpäev   - päevasumma
     hommik   - hommikune tipptund: suurim liikuv 60 min summa, algus 06:00...09:45
@@ -17,7 +17,7 @@ ARVUTUS
     NIHE (loenduri vahetus, rike või ehitus), on ristmik märgitud - tema muutus ei pruugi olla liikluse muutus.
 
 CALCULATION IN PLAIN ENGLISH
-  Same 4 school weeks (Mon-Fri, no holidays) in 2025 and 2026. Per junction (median over valid days, at least
+  Same 6 school weeks (Mon-Fri, no holidays) in 2025 and 2026. Per junction (median over valid days, at least
     MIN_PAEVI): daily total; morning peak hour = largest rolling 60-minute sum starting 06:00-09:45; evening = start
     14:00-18:45.
   Change % = (2026 value / 2025 value - 1) x 100. City total = sum of the junctions' medians (junctions present in both
@@ -40,9 +40,9 @@ from matplotlib.lines import Line2D
 
 from common import paeva_maatriks, load_tallinn, load_junctions, set_style, save, save_table, short_name, C_BLUE, C_ORANGE, C_GRAY, TEXT, TEXT2
 
-PERIOODID = {2025: ("2025-09-08", "2025-10-03"), 2026: ("2026-09-07", "2026-10-02")}
+PERIOODID = {2025: ("2025-09-08", "2025-10-17"), 2026: ("2026-09-07", "2026-10-16")}
 HOMMIK, OHTU = (24, 39), (56, 75)    # tipptunni algus 06:00...09:45 ja 14:00...18:45 (15 min pilud)
-MIN_PAEVI = 12
+MIN_PAEVI = 18      # 60% perioodi 30 tööpäevast (varem 12 päeva 20-st)
 NIHE = 0.08
 
 

@@ -9,7 +9,7 @@ SISEND
   valjund/09_ummikud.csv, 09_tsuklid.csv skripti 09 ummikud ja tsüklid (millistel ristmikel on stabiilne ummik;
                                          kalibreerimine) - 09 käib enne
   valjund/06_hajutamine_ristmikud.csv    skripti 06 hajutamisstsenaariumid (võrdlusjooned)
-  common.load_vehicles(None, koik=True)  sõidukipõhised päevad kalibreerimiseks
+  common.load_vehicles(None)  sõidukipõhised päevad kalibreerimiseks
 
 A) KOOLIPÄEVA ALGUS
   Varem algas kool 07:45...09:00, alates 1.09.2026 kõikjal kell 9. Võrreldakse sama septembriakent (3.-20.09, tööpäevad;
@@ -40,7 +40,8 @@ B) VÄIKE LANGUS, SUUR VÕIT
   Iga ristmiku iga tööpäeva (õppetöö ja lühikesed koolivaheajad) hommiku (06-11) ja õhtu (14-20) kohta:
     täistase          = päeva suurima 15 min loenduse kohalik tavaväärtus (õppetöö-päevade libisev mediaan, 31 päeva;
                         kohalik, sest teetööd muudavad ristmiku taset)
-    aeg täistasemel   = minutid, mil 15 min loendus >= 90% täistasemest (ristmiku summa oma näitaja, mitte 09 ummik)
+    aeg täistasemel   = minutid, mil 15 min loendus on üle 85% täistasemest (HCM 2000 lk 10-46: läbilaskevõime lähedal;
+                        ristmiku summa oma näitaja, mitte 09 ummik)
     liikluse indeks   = tipuakna liiklus / selle kohalik tavaväärtus x 100; tipptunni indeks samamoodi
   1) kõver: keskmine aeg täistasemel indeksi 2,5% vahemike kaupa (päevadevaheline loomulik kõikumine; vahemik arvesse
      alates 50 päevast)
@@ -48,17 +49,25 @@ B) VÄIKE LANGUS, SUUR VÕIT
   3) 06 hajutamisstsenaariumide tipptunni vähenemine samal kõveral (tipptunni indeks)
   4) kalibreerimine sõidukipõhiste päevadega (ristmiku terved päevad): aeg täistasemel vs aeg täis tsüklites (09: täis
      tsüklite kestuse osa veerandtunni tsüklite kestusest x 15 min), Spearmani rho
+  5) mehaaniline võrdlus: tavalise õppetöö-päeva (indeks 97,5-102,5) 15 min profiil x s (0,80-1,15), täistase sama ->
+     aeg täistasemel ilma järjekorrata ja ilma profiili kuju muutuseta. Kõvera ja selle joone vahe on see osa, mida
+     ainult fikseeritud läve geomeetria ei seleta.
   Põhitulemus on ristmike ja tippude kohta, kus 09 leidis stabiilse ummiku vähemalt pooltel tööpäevadel ("ummikuga");
   teised ei pruugi täistasemel üldse küllastuda.
   12_03_vaike_muutus.png
       Näitab: kui tundlik on täistasemel oldud aeg liikluse väikese muutuse suhtes.
       Kuidas: 2 x 2 paneeli. Ülal vasakul kõver: x = tipuakna liiklus, % tavalisest (100 = tavaline õppetöö-tööpäev),
       y = aeg täistasemel, min päevas; sinine = hommik, oranž = õhtu, vari = 95% usaldusvahemik, romb = koolivaheaja
-      päevade keskmine. All vasakul sama tipptunni mahu järgi; püstjooned = 06 hajutamisstsenaariumid. Ülal paremal
+      päevade keskmine, katkendjoon = ainult skaleerimine (5). All vasakul sama tipptunni mahu järgi; püstjooned = 06 hajutamisstsenaariumid. Ülal paremal
       tulbad iga lühikese koolivaheaja kohta (hommik): hall = tipuakna liikluse muutus, %, sinine = täistasemel oldud
       aja muutus, %. All paremal kalibreerimine: punkt = ristmik ja tipp ühel päeval, x = aeg täistasemel (15 min
       loendus), y = aeg täis tsüklites (09); suur punkt = stabiilse ummikuga ristmik.
-  12_taistase_paevad.csv, 12_vaike_muutus_kover.csv, 12_vaheajad_taistase.csv, 12_kalibreerimine.csv
+  12_03b_vaike_muutus.png
+      Näitab: 12_03 ülemine vasak kõver eraldi, hommik: aeg täistasemel tavalise, 5% ja 10% väiksema liiklusega päeval.
+      Kuidas: sinine kõver = mõõdetud päevad (vari = 95% usaldusvahemik); hall katkendjoon = tavaline päev x s
+      (ainult skaleerimine, 5) ehk see osa, mis tuleb fikseeritud lävest.
+  12_taistase_paevad.csv, 12_vaike_muutus_kover.csv, 12_vaheajad_taistase.csv, 12_kalibreerimine.csv,
+  12_mehaaniline.csv
   ponytail: "aeg täistasemel" tuleb ristmiku summaarsest loendusest, mitte järjekorrast - see on ummiku asendusnäitaja
   (kalibreerimine näitab, kui hea) ja seos on vaatluslik, mitte järjekorramudel. Täpsem oleks manöövripõhine tsüklite
   analüüs (09) mitme nädala kohta.
@@ -70,13 +79,16 @@ CALCULATION IN PLAIN ENGLISH
      Junctions whose daily traffic changed more than 15% are left out. Result = median over junctions with a 95%
      bootstrap interval; Wilcoxon p for the junction metrics.
   B) Small drop, big gain. Full level = local usual value of the day's largest 15-minute count (31-day rolling median of
-     school days). Minutes at full level = 15 x number of 15-minute counts >= 90% of it. Traffic index = the window's
+     school days). Minutes at full level = 15 x number of 15-minute counts above 85% of it. Traffic index = the window's
      traffic / its local usual value x 100.
      1) Curve: average minutes at full level per 2.5% band of the index (bands with at least 50 days).
      2) Short school holidays vs 2 weeks before and after: traffic -x% gives minutes at full level -y%.
      3) The 06 spreading scenarios placed on the same curve.
      4) Calibration on complete per-vehicle junction-days: minutes at full level vs minutes in full cycles from 09
         (share of the quarter hour's cycle time that was in full cycles x 15), Spearman rho.
+     5) Mechanical reference: the 15-minute profiles of ordinary school days (index 97.5-102.5) multiplied by s
+        (0.80-1.15) against the same full level. This is the drop a fixed threshold gives with no queue and no change
+        of profile shape; only the gap between the curve and this line can come from congestion.
      Both axes come from the same counts, so part of the curve is mechanical (fewer vehicles means fewer counts above a
      fixed level); the calibration shows how well it tracks real congestion.
 """
@@ -87,13 +99,13 @@ import seaborn as sns
 from scipy import stats
 
 from common import (tervetel_paevadel, load_tallinn, load_junctions, load_vehicles, peak_metrics, mediaani_uv, short_name, slot_label,
-                    set_style, save, save_table, OUT_DIR, DIVERGING, C_BLUE, C_ORANGE, C_AQUA, C_GRAY, TEXT2)
+                    set_style, save, save_table, OUT_DIR, DIVERGING, X_LAHEDAL, C_BLUE, C_ORANGE, C_GRAY, TEXT2)
 
 AKEN = (3, 20)                              # septembri päevad (1.-2.09 aktus; 2026. a andmed lõpevad 20.09)
 PAARID = [(2025, 2024), (2026, 2025)]       # (aasta, võrdlusaasta); viimane paar = koolialguse muutus
 KASV_MAX = 15                               # ristmik välja, kui ööpäeva liiklus muutus üle +-15%
 TIPUD = {"hommik": (6, 11), "õhtu": (14, 20)}    # nagu 09
-TAIS = 0.9                                  # täistasemel = loendus >= 90% täistasemest
+TAIS = X_LAHEDAL                            # täistasemel = loendus > 85% täistasemest (HCM 2000 lk 10-46)
 VIIDE_PAEVI = 31                            # kohaliku tavaväärtuse libisev aken, õppetöö-päeva
 SAMM = 2.5                                  # indeksi vahemiku laius kõveral, %
 VARV = {"hommik": C_BLUE, "õhtu": C_ORANGE}
@@ -243,7 +255,7 @@ if (OUT_DIR / "09_ummikud.csv").exists():
     for tipp in TIPUD:
         n = um[um["tipp"].str.contains(tipp)].groupby("mp")["paev"].nunique()
         ummikuga |= {(int(m[2:]), tipp) for m in n.index[n >= um["paev"].nunique() / 2]}
-osad = []
+osad, skaala = [], []
 for tipp, (a, b) in TIPUD.items():
     x = too[too["slot"].between(a * 4, b * 4 - 1) & too["vaheaeg"].isin(["kool", "lühike"])]
     W = x.groupby(["mp_id", "paev", "slot"])["v"].sum(min_count=1).unstack("slot").dropna()     # ainult terved aknad
@@ -258,14 +270,26 @@ for tipp, (a, b) in TIPUD.items():
     d = pd.merge_asof(d.sort_values("paev"), kool[["mp_id", "paev", "tase", "tava", "tava_tipptund"]].sort_values("paev"),
                       on="paev", by="mp_id", direction="nearest").dropna(subset=["tase"])
     d["min_tais"] = (W.reindex(pd.MultiIndex.from_frame(d[["mp_id", "paev"]])).values
-                     >= TAIS * d["tase"].values[:, None]).sum(axis=1) * 15
+                     > TAIS * d["tase"].values[:, None]).sum(axis=1) * 15
     d["indeks"], d["tipptunni_indeks"] = d["maht"] / d["tava"] * 100, d["tipptund"] / d["tava_tipptund"] * 100
     osad.append(d.assign(tipp=tipp, ummikuga=[(m, tipp) in ummikuga for m in d["mp_id"]]))
+    # mehaaniline võrdlus: tavaline päev x s, sama täistase -> aeg täistasemel ainult läve geomeetriast
+    n = d[(d["vaheaeg"] == "kool") & d["indeks"].between(97.5, 102.5)]
+    P, tase = W.reindex(pd.MultiIndex.from_frame(n[["mp_id", "paev"]])).values, n["tase"].values[:, None]
+    um = np.array([(m, tipp) in ummikuga for m in n["mp_id"]])
+    for ryhm, sel in [("kõik", np.ones(len(n), bool)), ("ummikuga", um)]:
+        for s in np.round(np.arange(0.80, 1.151, SAMM / 100), 3):
+            skaala.append(dict(tipp=tipp, ryhm=ryhm, indeks=round(s * 100, 1), paevi=int(sel.sum()),
+                               min_tais=((P[sel] * s) > TAIS * tase[sel]).sum(axis=1).mean() * 15))
+        assert abs(skaala[-7]["min_tais"] - n.loc[sel, "min_tais"].mean()) < 1e-6     # s = 1 -> samad päevad
 d = pd.concat(osad, ignore_index=True)
 save_table(d.assign(mp=d["mp_id"].map(j["code"]), paev=d["paev"].dt.date)
            [["mp", "paev", "tipp", "vaheaeg", "ummikuga", "maht", "indeks", "tipptund", "tipptunni_indeks", "tase", "min_tais"]]
            .round(1), "12_taistase_paevad")
 RYHM = "ummikuga" if ummikuga else "kõik"
+mehaan = pd.DataFrame(skaala)
+save_table(mehaan.round(2), "12_mehaaniline")
+mh = lambda tipp, ryhm, i: mehaan.set_index(["tipp", "ryhm", "indeks"])["min_tais"][(tipp, ryhm, i)]
 valik = lambda x, ryhm=RYHM: x[x["ummikuga"]] if ryhm == "ummikuga" else x
 kooli = d[d["vaheaeg"] == "kool"]
 print(f"\nB) Väike langus, suur võit: {len(d):,} ristmik-päev-tippu; stabiilse ummikuga ristmik-tippe {len(ummikuga)} "
@@ -289,6 +313,10 @@ for ryhm in ["kõik"] + (["ummikuga"] if ummikuga else []):
             m100, m95, m90 = (juures(x, veerg, c) for c in (100, 95, 90))
             print(f"   {ryhm}, {tipp}, {veerg}: tavalisel päeval {m100:.0f} min täistasemel; 5% vähem liiklust -> "
                   f"{m95:.0f} min ({(m95 / m100 - 1) * 100:+.0f}%); 10% vähem -> {m90:.0f} min ({(m90 / m100 - 1) * 100:+.0f}%)")
+            if veerg == "indeks":
+                b100, b95, b90 = (mh(tipp, ryhm, i) for i in (100.0, 95.0, 90.0))
+                print(f"      ainult skaleerimine (tavaline päev x 0,95 / 0,90): {(b95 / b100 - 1) * 100:+.0f}% / "
+                      f"{(b90 / b100 - 1) * 100:+.0f}%")
 save_table(pd.concat(krows).rename(columns={"mean": "min_tais_keskmine", "sem": "standardviga", "size": "paevi"}).round(2),
            "12_vaike_muutus_kover")
 
@@ -318,7 +346,7 @@ print(f"   Lühikesed koolivaheajad ({va['vaheaeg_algus'].nunique()} tk, {RYHM};
 
 # kalibreerimine: sama näitaja sõidukipõhistest päevadest vs täis tsüklites liikunud sõidukite aeg (09, nagu 10_02_kullastus)
 kalib = None
-veh = load_vehicles(None, koik=True)
+veh = load_vehicles(None)
 if veh is not None and (OUT_DIR / "09_tsuklid.csv").exists():
     veh = veh.assign(paev=veh["ts"].dt.normalize(), slot=veh["ts"].dt.hour * 4 + veh["ts"].dt.minute // 15)
     veh = tervetel_paevadel(veh)                                     # ristmiku terved päevad (kõik pordid kaetud)
@@ -336,7 +364,7 @@ if veh is not None and (OUT_DIR / "09_tsuklid.csv").exists():
         for (mp, paev), r in n15[sl].iterrows():
             if (mp, tipp) in viim.index and (mp, paev) in k.index:
                 rows.append(dict(mp_id=mp, paev=paev.date(), tipp=tipp, ummikuga=(mp, tipp) in ummikuga,
-                                 min_taistasemel_15min=int((r.values >= TAIS * viim[(mp, tipp)]).sum() * 15),
+                                 min_taistasemel_15min=int((r.values > TAIS * viim[(mp, tipp)]).sum() * 15),
                                  min_tais_tsuklites=k.loc[(mp, paev), sl].sum()))
     kalib = pd.DataFrame(rows)
     rho = stats.spearmanr(kalib["min_taistasemel_15min"], kalib["min_tais_tsuklites"])
@@ -356,6 +384,9 @@ for ax, veerg, xl in [(axes[0, 0], "indeks", "Tipuakna liiklus, % tavalisest (10
         ax.plot(g.index, g["mean"], "o-", color=col, ms=4,
                 label=f"{tipp}: 5% vähem -> {(m95 / m100 - 1) * 100:+.0f}% aega täistasemel")
         if veerg == "indeks":                                    # koolivaheaja päevad samal teljel
+            b = mehaan[(mehaan["tipp"] == tipp) & (mehaan["ryhm"] == RYHM) & mehaan["indeks"].between(g.index.min(), g.index.max())]
+            ax.plot(b["indeks"], b["min_tais"], "--", color=col, lw=1.2, alpha=0.8,
+                    label=f"{tipp}, ainult skaleerimine: {(mh(tipp, RYHM, 95.0) / mh(tipp, RYHM, 100.0) - 1) * 100:+.0f}%")
             h = valik(d[(d["vaheaeg"] == "lühike") & (d["tipp"] == tipp)])
             ax.plot(h[veerg].mean(), h["min_tais"].mean(), "D", color=col, ms=9, mec="black", zorder=5)
     ax.axvline(100, color=TEXT2, lw=0.6, ls=":")
@@ -371,6 +402,7 @@ axes[1, 0].legend(fontsize=9, loc="lower right")
 hf = OUT_DIR / "06_hajutamine_ristmikud.csv"
 if hf.exists():                             # 06: tipptunni vähenemine, kui 20% tipptunni sõitudest nihkub
     hr = pd.read_csv(hf, encoding="utf-8-sig")
+    hr = hr[hr["code"] != "KÕIK"]           # ristmike mediaan nagu 06 väljatrükis, ilma kogusumma reata
     for veerg, ls in [("hommik_20%_mõlemad_30min_%", "--"), ("hommik_20%_ühtlane_60min_%", "-.")]:
         if veerg in hr:
             vah = hr[veerg].median()
@@ -405,8 +437,31 @@ if kalib is not None:
                  f"{rho.statistic:.2f})", fontsize=11)
 else:
     ax.axis("off")
-fig.suptitle(f"Väike langus, suur võit: aeg, mil ristmik töötab täistasemel (>= {TAIS:.0%} tavalisest suurimast 15 min loendusest)",
+fig.suptitle(f"Väike langus, suur võit: aeg, mil ristmik töötab täistasemel (üle {TAIS:.0%} tavalisest suurimast 15 min loendusest)",
              x=0.01, ha="left", fontweight="bold")
 fig.tight_layout()
 save(fig, "12_03_vaike_muutus")
+x = valik(kooli[kooli["tipp"] == "hommik"])                       # 12_03b: hommik, tekstis kasutatud punktid
+g = kover(x, "indeks")
+fig, ax = plt.subplots(figsize=(9, 5.5))
+ax.fill_between(g.index, g["mean"] - 1.96 * g["sem"], g["mean"] + 1.96 * g["sem"], color=VARV["hommik"], alpha=0.2, lw=0)
+ax.plot(g.index, g["mean"], "o-", color=VARV["hommik"], ms=4, label="mõõdetud päevad")
+b = mehaan[(mehaan["tipp"] == "hommik") & (mehaan["ryhm"] == RYHM) & mehaan["indeks"].between(90, g.index.max())]
+ax.plot(b["indeks"], b["min_tais"], "--", color=C_GRAY, lw=1.5,
+        label=f"ainult skaleerimine (tavaline päev x s): 95% -> {(mh('hommik', RYHM, 95.0) / mh('hommik', RYHM, 100.0) - 1) * 100:+.0f}%")
+ax.legend(fontsize=9, loc="upper left")
+m100 = juures(x, "indeks", 100)
+for p in (100, 95, 90):
+    m = juures(x, "indeks", p)
+    ax.plot(p, m, "o", color="black", ms=8, zorder=5)
+    ax.annotate(f"{p}%: {m:.0f} min" + ("" if p == 100 else f" ({(m / m100 - 1) * 100:+.0f}%)"), (p, m), xytext=(8, -4),
+                textcoords="offset points", fontsize=9, va="top")
+ax.axvline(100, color=TEXT2, lw=0.6, ls=":")
+ax.set_ylim(0, None)
+ax.set_xlabel("Tipuakna liiklus, % tavalisest (100 = tavaline õppetöö-tööpäev)")
+ax.set_ylabel("Aeg täistasemel, min päevas (keskmine)")
+ax.set_title(f"Hommik ({RYHM} ristmikud): väiksema liiklusega päeval on aeg täistasemel mitu korda lühem\n"
+             "(vari = 95% usaldusvahemik)", fontsize=10, loc="left")
+fig.tight_layout()
+save(fig, "12_03b_vaike_muutus")
 print("Valmis.")

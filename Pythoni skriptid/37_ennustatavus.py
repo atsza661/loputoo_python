@@ -50,7 +50,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 from common import (paeva_maatriks, load_tallinn, load_junctions, set_style, save, save_table, short_name, slot_label, C_BLUE, C_ORANGE,
-                    C_GRAY, TEXT, TEXT2)
+                    C_GRAY, TEXT2)
 
 ALGUS = "2025-09-01"
 PANEEL_OSA = 0.9

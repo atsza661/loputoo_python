@@ -56,7 +56,7 @@ from matplotlib.colors import Normalize
 from matplotlib.lines import Line2D
 
 from common import (maantee_suunad, load_tallinn, load_junctions, add_basemap, to_merc, slot_label, set_style, save,
-                    save_table, umarda, C_RED, TEXT2)
+                    save_table, umarda, C_RED)
 
 ALGUS = "2025-09-01"                 # nagu 13: viimane õppeaasta kuni andmete lõpuni
 MIN_PAEVI = 20                       # koht kaardile, kui tavalisi tööpäevi on vähemalt nii palju
@@ -190,7 +190,7 @@ for nimi, punktid, pad, k in [("harju", pd.concat([sk[["lon", "lat"]], jn[["lon"
                             Line2D([], [], marker="s", ls="", color="#f8b04b", markeredgecolor="black", ms=8, label="ristmik")],
                    loc="lower center", ncol=3, fontsize=10, bbox_to_anchor=(0.5, -0.012))
         fig.suptitle(f"{'Harjumaa maanteed ja Tallinna ristmikud' if nimi == 'harju' else 'Tallinna ristmikud'}: tavaline tööpäev "
-                     f"15 min kaupa, kell {a:02d}.00–{b - 1:02d}.45 (värv = koormus % koha tipust, suurus = vool; "
+                     f"15 min kaupa, kell {a:02d}.00–{b - 1:02d}.45 (värv = koormus % koha tipust, suurus = sagedus; "
                      f"{paevi_mt} / {paevi_j} tööpäeva alates {pd.Timestamp(ALGUS):%d.%m.%Y})", x=0.01, ha="left",
                      fontweight="bold", fontsize=12)
         save(fig, f"20_{nr:02d}_{nimi}_{a:02d}-{b:02d}")

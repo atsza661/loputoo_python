@@ -65,7 +65,7 @@ import seaborn as sns
 
 from common import (load_daily, load_locations, counter_month, clean, load_fuel_county,
                     load_fuel_national, set_style, save, save_table, yoy, corr_pair,
-                    FUEL_COLOR, FUEL_LABEL, GROUP_LABEL, C_BLUE, C_ORANGE, C_GRAY, TEXT2,
+                    FUEL_COLOR, FUEL_LABEL, GROUP_LABEL, C_BLUE, TEXT2,
                     DIVERGING, tabel, add_basemap, to_merc)
 
 set_style()
@@ -105,11 +105,11 @@ for _, r in ref.iterrows():
     ax.annotate(f"T{int(r.tee_nr)}", (r.adt, r.mln_skm), xytext=(6, 4),
                 textcoords="offset points", fontsize=9, color=TEXT2)
 c = corr_pair(ref["adt"], ref["mln_skm"])
-ax.text(0.03, 0.96, f"r = {c['r']:.2f}, ρ = {c['rho']:.2f}, n = {c['n']} teed",
+ax.text(0.03, 0.96, f"r = {c['r']:.2f}, ρ = {c['rho']:.2f}, n = {c['n']} teed\nmulli suurus = loendurite arv",
         transform=ax.transAxes, va="top", fontsize=9, color=TEXT2)
 ax.set_xlabel("Tee loendurite keskmine ööpäevane liiklus 2023, sõidukit/ööp")
 ax.set_ylabel("Läbisõit 2023, mln sõidukikm")
-ax.set_title("Põhimaanteede läbisõit vs loendurite liiklus (mulli suurus = loendurite arv)")
+ax.set_title("Põhimaanteede läbisõit vs loendurite liiklus")
 save(fig, "04_01_labisoit_vs_adt")
 
 # --- b) Aastased muutused: fikseeritud loendurite komplekt kahe aasta vahel -------------------
@@ -136,7 +136,7 @@ ax.axhline(0, color=TEXT2, lw=0.6)
 ax.axvline(0, color=TEXT2, lw=0.6)
 ax.set_xlabel("Loendurite liikluse aastane muutus, % (samad loendurid)")
 ax.set_ylabel("Läbisõidu aastane muutus, %")
-ax.set_title("Põhimaanteed: läbisõidu ja loendatud liikluse aastased muutused")
+ax.set_title("Läbisõidu ja loendatud liikluse aastamuutus")
 save(fig, "04_02_labisoit_muutus")
 
 # --- c) Iga loendur vs oma maakonna kütus ----------------------------------------------------

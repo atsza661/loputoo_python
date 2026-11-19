@@ -7,13 +7,12 @@ liikluse mahu ja koormusastme poolest.
 SISEND
   valjund/24_soojus_ajatelg/24_koormus_5min.csv   skripti 24 tabel (24 käib enne): iga ristmiku koormusaste (% kanalite
                                                   läbilaskevõimest, seisak = täis) ja sõidukite arv igal 5 min pilul
-                                                  kell 06-19 logija päevadel 16.-23.10.2026
+                                                  kell 06-19 logija päevadel 16.-22.10.2026
   common.load_junctions()                         ristmike koordinaadid
   common.add_basemap()                            ortofototaust (Maa- ja Ruumiamet)
 
 ARVUTUS
-  Päevatüübid (TYYBID): teisipäev-neljapäev (20.-22.10, kolme päeva keskmine), esmaspäev (19.10), reede (16. ja 23.10
-  keskmine), laupäev (17.10), pühapäev (18.10). Ristmiku koormusaste päevatüübil = tüübi päevade koormusastme keskmine
+  Päevatüübid (TYYBID): teisipäev-neljapäev (20.-22.10, kolme päeva keskmine), esmaspäev (19.10), reede (16.10), laupäev (17.10), pühapäev (18.10). Ristmiku koormusaste päevatüübil = tüübi päevade koormusastme keskmine
   samal kellaajal (puuduvad päevad jäetakse välja; kui puuduvad kõik, on ristmik puuduv).
   Värvipind ja jooned nagu 23: Gaussi kaaluga keskmine (Nadaraya-Watsoni silumine) z(x) = Σ w_i z_i / Σ w_i,
   w_i = exp(-d_i² / (2 h²)), h = H_KM; pind hajub 2 h ja kaob 3 h kaugusel lähimast ristmikust, millel on andmed.
@@ -63,7 +62,7 @@ from common import (OUT_DIR, FIG_DIR, DATA_DIR, load_junctions, add_basemap, to_
 TYYBID = {                           # failinimi: (silt, päevad, joone värv)
     "t-n": ("Teisipäev-neljapäev (20.-22.10 keskmine)", ["2026-10-20", "2026-10-21", "2026-10-22"], C_BLUE),
     "e": ("Esmaspäev (19.10)", ["2026-10-19"], C_AQUA),
-    "r": ("Reede (16. ja 23.10 keskmine)", ["2026-10-16", "2026-10-23"], C_ORANGE),
+    "r": ("Reede (16.10)", ["2026-10-16"], C_ORANGE),
     "l": ("Laupäev (17.10)", ["2026-10-17"], C_VIOLET),
     "p": ("Pühapäev (18.10)", ["2026-10-18"], C_RED),
 }
@@ -74,8 +73,8 @@ JOONE_SAMM = 10                      # sama koormusastme jooned iga 10 protsendi
 H_KM = 1.0                           # silumislaius (km), nagu 23 Tallinna kaardil
 VORK = 600                           # võrgusõlmi kaardi laiuses (nagu 23)
 DPI = 100                            # 780 ortofotokaarti: 200 dpi annaks mitu GB
-FPS = 8
-GIF_LAIUS, GIF_MS = 480, 125
+FPS = 4
+GIF_LAIUS, GIF_MS = 480, 1000 // FPS     # GIF kaadri kestus ms, sama kiirus kui MP4
 VARV = LinearSegmentedColormap.from_list("turbo_t", plt.get_cmap("turbo")(np.linspace(0.1, 0.93, 256)))  # nagu 23
 NORM = Normalize(*SKAALA)
 SISSE = OUT_DIR / "24_soojus_ajatelg" / "24_koormus_5min.csv"
@@ -169,7 +168,7 @@ a1.set_xlabel("Kellaaeg")
 a2.set_xlabel("Kellaaeg")
 fig.legend(*a1.get_legend_handles_labels(), loc="outside lower center", ncol=len(TYYBID), fontsize=10)
 fig.suptitle(f"Päevatüüpide erinevus Tallinna ristmikel kell {KELL[0]:02d}-{KELL[1]:02d} (sõidukipõhised loendused "
-             f"16.-23.10.2026, 5 min)", x=0.01, ha="left", fontweight="bold")
+             f"16.-22.10.2026, 5 min)", x=0.01, ha="left", fontweight="bold")
 save(fig, "25_soojus_paevatyybid/25_02_paevatyybid_vordlus")
 
 # --- Kaardid -------------------------------------------------------------------------------------------------------------

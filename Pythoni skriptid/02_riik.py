@@ -79,7 +79,7 @@ import statsmodels.formula.api as smf
 
 from common import (load_daily, counter_month, traffic_index, load_fuel_national,
                     set_style, save, save_table, yoy, stl_resid, corr_pair, month_axis,
-                    FUEL_COLOR, FUEL_LABEL, GROUP_LABEL, C_GRAY, TEXT2, BASE_YEAR, tabel, START, END)
+                    FUEL_COLOR, FUEL_LABEL, GROUP_LABEL, C_GRAY, TEXT2, BASE_YEAR, tabel)
 
 set_style()
 print("Laen andmeid...")
@@ -223,7 +223,7 @@ ax.axvline(0, color=TEXT2, lw=0.6, ls=":")
 ax.axhline(0, color=TEXT2, lw=0.6)
 ax.set_xlabel("Nihe, poolkuud (positiivne = müük järgneb liiklusele)")
 ax.set_ylabel("Pearson r (aastased muutused)")
-ax.set_title("Liikluse ja kütusemüügi korrelatsioon nihkega (poolkuu andmed, 2021-2026)")
+ax.set_title("Liikluse ja kütusemüügi korrelatsioon nihkega, 2021–2026")
 ax.legend(fontsize=9, loc="upper right")
 save(fig, "02_05_viitega_korrelatsioon")
 print("Valmis.")

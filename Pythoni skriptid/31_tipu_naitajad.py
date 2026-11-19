@@ -1,6 +1,7 @@
 """
 31 - Tipptunni näitajad ristmike kaupa: tipptunni osakaal ööpäevast (K-tegur), tipptunni tegur (PHF) ning hommiku- ja
-õhtutipu suurus ja kellaaeg - liikluskorralduse standardnäitajad, mis näitavad, kui terav ja kui suur on tipp.
+õhtutipu suurus ja kellaaeg - liikluskorralduse standardnäitajad, mis näitavad, kui terav ja kui suur on tipp - ning
+ööpäeva ja tipptunni lineaarne seos (nagu Wang jt 2018 Shenyangi 318 ristmiku kohta).
 
 SISEND
   common.load_tallinn()      ristmike 15 min loendused puhastatult (tallinn.count_15min)
@@ -17,6 +18,8 @@ ARVUTUS
     PHF        - tipptunni maht / (4 x tipptunni suurim veerandtund). 1 = tunni sees ühtlane, 0,25 = kogu tund ühes
                  veerandtunnis; väike PHF = terav lühike tipp (nt kooli algus).
   Tipu iseloom: hommik / õhtu = hommikuse ja õhtuse tipptunni suhe (> 1,1 hommikutipuga, < 0,9 õhtutipuga).
+  Ööpäev vs tipptund: Q = a + b q vähimruutudega, Q = ristmiku ööpäev, q = suurem tipptund (hommik või õhtu), mõlemad
+    päevade mediaanid; R² ja tipptunni osakaal q / Q. Võrdluseks Wang jt 2018 sirge Q = -709,9 + 13,88 q.
 
 CALCULATION IN PLAIN ENGLISH
   Typical workdays from ALGUS (at least MIN_PAEVI). Peak metrics are computed for each day separately and the junction
@@ -24,10 +27,14 @@ CALCULATION IN PLAIN ENGLISH
     hours). Peak start and traffic midpoint come from the average profile, comparable with 06.
   K-factor = peak-hour volume / daily volume x 100. PHF = peak-hour volume / (4 x its busiest quarter hour).
   Peak type: morning / evening peak-hour ratio (> 1.1 morning peak, < 0.9 evening peak).
+  Day vs peak hour: least-squares line Q = a + b q, Q = junction daily volume, q = the larger of its two peak hours
+    (both medians over days); R squared and the peak-hour share q / Q. Wang et al. 2018 line for comparison.
 
 VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/)
   31_01_tipu_naitajad.png
       Näitab: kui terav (K-tegur, PHF) ja kui suur on iga ristmiku hommikune ja õhtune tipp ning kumb on suurem.
+  31_01_01_k_tegur.png
+      Näitab: 31_01 vasak paneel eraldi: iga ristmiku hommikuse ja õhtuse tipptunni osakaal ööpäevast (K-tegur).
       Kuidas: rida = ristmik (järjestatud suurema K-teguri järgi), kolm paneeli ühise y-teljega. 1) K-tegur, %;
       2) PHF; 3) tipptunni maht, tuhat sõidukit tunnis, joon hommiku ja õhtu vahel. Sinine = hommik, oranž = õhtu;
       paremal tipptundide algused. Hall vöönd 1. paneelil = linnatänavate tavaline K 7-12%.
@@ -35,6 +42,11 @@ VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/)
       Näitab: kas teravad tipud (suur K) on ka tunni sees teravad (väike PHF) - kus hajutamisel oleks kõige rohkem mõju.
       Kuidas: hajuvusdiagramm; x = K-tegur, %, y = PHF; punkt = ristmiku tipp (sinine = hommik, oranž = õhtu),
       suurus = tipptunni maht. Sildid ristmikel, mille K on suurim või PHF väikseim.
+  31_03_oopaev_tipptund.png
+      Näitab: kui täpselt saab ristmiku ööpäeva liiklust hinnata tipptunni loendusest.
+      Kuidas: hajuvusdiagramm; x = suurem tipptund, tuhat sõid/h, y = ööpäev, tuhat sõidukit; punkt = ristmik (sinine =
+      suurim tund hommikul, oranž = õhtul). Tume joon = sobitus (võrrand ja R² pealkirjas), hall katkendjoon = Wang jt
+      2018 sirge.
   31_tipu_naitajad.csv   ristmik: päevi, ööpäev, mõlema tipu algus, maht, K, PHF, laius, keskaeg; hommik/õhtu suhe
 """
 import numpy as np
@@ -108,6 +120,23 @@ fig.suptitle(f"Tipptunni näitajad, tüüpiline tööpäev (õppetöö, alates {
 fig.tight_layout(rect=(0, 0.03, 1, 0.98))
 save(fig, "31_01_tipu_naitajad")
 
+# --- joonis 1, ainult K-tegur ------------------------------------------------------------------------------------------
+fig, a = plt.subplots(figsize=(7, 0.25 * len(r) + 1.9))
+a.axvspan(7, 12, color=GRID, alpha=0.6, lw=0)
+for k, c in [("hommik", C_BLUE), ("ohtu", C_ORANGE)]:
+    a.scatter(r[f"{k}_osakaal_%"], y, color=c, s=24, zorder=3)
+a.set_yticks(y, [f"{k} {short_name(m, 28, compact=True)}" for k, m in zip(r["kood"], r["nimi"])], fontsize=8)
+a.set_ylim(-0.7, len(r) + 0.6)
+a.set_xlabel("% ööpäeva liiklusest")
+a.set_title(f"K-tegur: tipptund, % ööpäevast, tüüpiline tööpäev (õppetöö, alates {pd.Timestamp(ALGUS):%d.%m.%Y})",
+            loc="left", fontweight="bold")
+fig.legend(handles=[Line2D([], [], marker="o", ls="", color=C_BLUE, label="hommikune tipptund (algus 06-10)"),
+                    Line2D([], [], marker="o", ls="", color=C_ORANGE, label="õhtune tipptund (algus 14-19)"),
+                    plt.Rectangle((0, 0), 1, 1, color=GRID, alpha=0.6, label="tavaline K linnatänaval 7-12%")],
+           loc="lower center", ncol=2, bbox_to_anchor=(0.5, -0.01), fontsize=8.5)
+fig.tight_layout(rect=(0, 0.035, 1, 1))
+save(fig, "31_01_01_k_tegur")
+
 # --- joonis 2: K vs PHF ---------------------------------------------------------------------------------------------------
 fig, a = plt.subplots(figsize=(9, 6.5))
 xs, ys, tx = [], [], []
@@ -126,7 +155,33 @@ a.legend(loc="lower left", fontsize=8.5, labelspacing=1.2, borderpad=1)
 fig.tight_layout()
 save(fig, "31_02_k_vs_phf")
 
+# --- joonis 3: ööpäev vs tipptund (Wang jt 2018) --------------------------------------------------------------------------
+q, Q = r[["hommik_soid_h", "ohtu_soid_h"]].max(axis=1), r["ooopaev"]
+b, a0 = np.polyfit(q, Q, 1)
+r2 = np.corrcoef(q, Q)[0, 1] ** 2
+osa = q / Q * 100
+ohtul = r["ohtu_soid_h"] > r["hommik_soid_h"]
+fig, a = plt.subplots(figsize=(8.5, 6))
+a.scatter(q[~ohtul] / 1000, Q[~ohtul] / 1000, color=C_BLUE, s=30, label="suurim tund hommikul")
+a.scatter(q[ohtul] / 1000, Q[ohtul] / 1000, color=C_ORANGE, s=30, label="suurim tund õhtul")
+xx = np.array([0, q.max() * 1.05])
+a.plot(xx / 1000, (a0 + b * xx) / 1000, color=TEXT2, lw=1.2, label="sobitus")
+a.plot(xx / 1000, (-709.9 + 13.88 * xx) / 1000, color=C_GRAY, lw=1, ls="--", label="Wang jt 2018 (Shenyang)")
+place_labels(a, list(q[osa.rank(ascending=False) <= 3] / 1000), list(Q[osa.rank(ascending=False) <= 3] / 1000),
+             list(r.loc[osa.rank(ascending=False) <= 3, "kood"]), fontsize=7.5)
+a.set_xlim(0, None)
+a.set_ylim(0, None)
+a.set_xlabel("Suurem tipptund (hommik või õhtu), tuhat sõidukit tunnis")
+a.set_ylabel("Ööpäev, tuhat sõidukit")
+a.set_title(f"Ööpäev ja tipptund, {len(r)} ristmikku: Q = {a0:.0f} + {b:.2f} q (R² = {r2:.2f})\n"
+            f"tipptund on keskmiselt {osa.mean():.1f}% ööpäevast ({osa.min():.1f}–{osa.max():.1f}%)", fontsize=10)
+a.legend(loc="upper left", fontsize=8.5)
+fig.tight_layout()
+save(fig, "31_03_oopaev_tipptund")
+
 print(r["iseloom"].value_counts().to_string())
 print(f"K hommik mediaan {r['hommik_osakaal_%'].median():.1f}%, õhtu {r['ohtu_osakaal_%'].median():.1f}%; "
       f"PHF hommik {r['hommik_phf'].median():.3f}, õhtu {r['ohtu_phf'].median():.3f}; "
       f"suurim K {r['K_max'].max():.1f}% ({r['kood'].iloc[-1]})")
+print(f"Ööpäev vs tipptund: Q = {a0:.0f} + {b:.2f} q, R² = {r2:.3f}; tipptund {osa.mean():.1f}% ööpäevast "
+      f"({osa.min():.1f}–{osa.max():.1f}%), suurim tund õhtul {int(ohtul.sum())} ristmikul {len(r)}-st")
