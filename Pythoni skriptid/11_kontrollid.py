@@ -231,7 +231,9 @@ US = {"kiirus_0": ("kiirus 0 km/h", C_BLUE), "kiirus_ule_120": ("kiirus üle 120
 u = us.assign(mp=mp_nimi(us["mp_id"])).sort_values("mp", ascending=False)
 fig, ax = plt.subplots(figsize=(9, 11), layout="constrained")
 for veerg, (silt, varv) in US.items():
-    ax.scatter(u[veerg], u["mp"], s=26, color=varv, edgecolor="white", lw=0.5, label=silt, zorder=3)
+    kokku = (u[veerg] * u["soidukeid"]).sum() / u["soidukeid"].sum()        # kõigi sõidukite osakaal, nagu tekstis
+    ax.scatter(u[veerg], u["mp"], s=26, color=varv, edgecolor="white", lw=0.5, zorder=3,
+               label=f"{silt} (kõigist sõidukitest {kokku:.2f}%)".replace(".", ","))
 ax.set_xlim(left=0)
 ax.set_xlabel("Osakaal ristmiku sõidukitest, %")
 ax.legend(loc="lower right", fontsize=9)

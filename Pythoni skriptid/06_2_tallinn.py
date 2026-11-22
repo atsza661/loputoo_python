@@ -7,6 +7,8 @@ SISEND
   common.load_tallinn(), load_junctions()     ristmike 15 min loendused puhastatult, päevatüübi ja koolivaheaja märkega;
                                               ristmike koodid ja nimed
   common.tooaeva_profiilid()                  tavaliste tööpäevade 15 min profiilid päevade kaupa (päevast päeva kõikumine)
+  common.load_vehicles(), direction_share()   logija nädala sõidukipõhised kirjed: LSS osakaal ja LSS kanalite kiirus
+                                              (ainult 06_2_06b)
   common.mudeli_parameetrid()                 mudel A (foori viivitus -> kiirus, vt 40_0): ristmiku piir (27), tsükkel (09),
                                               g/C ja küllastusvoog (33)
   valjund/07_maantee_profiilid.csv            Tallinna kaardi maanteeloendurite 15 min profiilid (07)
@@ -99,6 +101,16 @@ VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/)
       Kuidas: joondiagramm kell 5-11; tume joon = praegune profiil, sinine = 20% tipuaja sõitudest jaotub +-30 min,
       oranž = +-60 min; hall vöönd = praegune tipuaeg, punktiir = tipuaja lävi (sõidukeid 15 min). Legendis tipuaja
       tasemel minutid ja muutus.
+  06_2_06b_lame_tipp.png
+      Näitab: linna sisse suunduv (LSS) hommik ristmikul, kus LSS kanalite kiirus langeb hommikul (kell 6-10, aeglaseim
+      veerandtund vs tavakiirus) kõige rohkem (mõlemat suunda vähemalt 5% liiklusest), kui tipp lõigatakse tasemele,
+      mil LSS kiirus polnud veel langenud, ja lõigatud sõidukid sõidavad lähimatel veerandtundidel enne ja pärast.
+      Kuidas: LSS profiil = tüüpilise tööpäeva profiil x logija nädala LSS osakaal samas pilus (common.direction_share).
+      LSS kiirus = liikuvate sõidukite keskmine loenduri kiirus pilus (logija nädala tööpäevad); tavakiirus = pilude
+      mediaan kell 06-20. Lõike tase = viimase enne tippu oleva pilu voog, mille kiirus pole alla tavakiiruse; tipu
+      vähenemine = 100% - see tase / tipp. Iga lähim madalam pilu täidetakse kuni uue tipuni, võrdsel kaugusel pooleks;
+      päeva summa ei muutu. Punane = tipust ära, roheline = kuhu nad lähevad (varem ja hiljem); roheline joon = uus
+      lame profiil; punkt = lõike taseme pilu. Joonis kell 4 kuni viimase muutunud pilu järel (vähemalt 12).
   06_2_07_koormus_ristmikud.png
       Näitab: kui koormatud on iga ristmik oma tipptunnil ja tipuajal: täis tsüklites (ummikus) liikunud sõidukite
       osakaal (10_kullastus, logija nädala tööpäevad). Toetab 3.4 seletust, et linna summas on ka vähem koormatud
@@ -120,7 +132,8 @@ import seaborn as sns
 from common import (OUT_DIR, SUUND, STS_AKNAD, TIPUAJA_ALA, load_tallinn, load_junctions, tooaeva_profiilid,
                     mudeli_parameetrid, ristmike_kiirus, ristmike_tipumura, tipu_mura, tipuaja_lavi, tipuaeg,
                     tipuaja_naitajad, shift_peak, peak_hour, short_name, set_style, save, save_table,
-                    otsamargid, suunad_korvuti, AM_WINDOW, C_BLUE, C_ORANGE, C_AQUA, C_GRAY, C_YELLOW, TEXT2)
+                    otsamargid, suunad_korvuti, load_vehicles, direction_share, hhmm, LOGIJA_NADAL, AM_WINDOW, C_BLUE,
+                    C_ORANGE, C_AQUA, C_GRAY, C_YELLOW, C_GREEN, C_RED, TEXT2, PIIR_MAANTEE)
 
 assert not SUUND, "06_2 teeb ainult mõlemad suunad koos (SUUND ei kehti)"
 PH = 4                                   # 15 min pilud
@@ -198,7 +211,8 @@ rows.append(dict(mp_id=0, code="KÕIK", nimi="Kõik ristmikud kokku (ainult sage
                  **tipuaja_naitajad(city, LV[0])))
 
 # Tallinna kaardi maanteeloendurid: profiil 07-st, tipuaeg 07_2-st (mõõdetud kiirusega). mp_id < 0 = maantee.
-hw = pd.read_csv(OUT_DIR / "07_maantee_profiilid.csv", encoding="utf-8-sig")
+hw = pd.read_csv(OUT_DIR / "07_maantee_profiilid.csv", encoding="utf-8-sig", dtype={"id": str})
+hw = hw[hw["id"].isin(PIIR_MAANTEE)]           # ainult linna piiriloendurite maanteed (nagu 06)
 hw.index = -np.arange(1, len(hw) + 1)
 hprof = pd.DataFrame(hw[[str(i) for i in range(96)]].to_numpy(), index=hw.index)
 h2 = pd.read_csv(OUT_DIR / "07_2_tipuajad_kohad.csv", encoding="utf-8-sig").set_index("koht")
@@ -282,7 +296,14 @@ ax.set_yticks(range(len(p2)))
 ax.set_yticklabels([silt[m] for m in p2.index], fontsize=fs)
 ax.set_xlim(5, 21)
 ax.set_xticks(range(5, 22))
-ax.set_xlabel("Kellaaeg (riba = tipuaeg, number = kestus, min; punktiir = 60 min; taust = kõigi ristmike summa tipuaeg)")
+J = P.loc[P.index > 0]                             # ainult ristmikud
+kk = lambda tp: (f"{dict(hommik='Hommik', ohtu='Õhtu')[tp]}: mediaan {J[f'{tp}_kestus_min'].median():.0f} min (kvartiilid "
+                 f"{J[f'{tp}_kestus_min'].quantile(.25):.0f}–{J[f'{tp}_kestus_min'].quantile(.75):.0f}, vahemik "
+                 f"{J[f'{tp}_kestus_min'].min():.0f}–{J[f'{tp}_kestus_min'].max():.0f}); alla tunni "
+                 f"{(J[f'{tp}_kestus_min'] < 60).sum()}, tund {(J[f'{tp}_kestus_min'] == 60).sum()}, üle tunni "
+                 f"{(J[f'{tp}_kestus_min'] > 60).sum()} ristmikul")
+ax.set_xlabel("Kellaaeg (riba = tipuaeg, number = kestus, min; punktiir = 60 min; taust = kõigi ristmike summa tipuaeg)\n"
+              + "\n".join(kk(tp) for tp in ["hommik", "ohtu"]))
 ax.set_ylim(-0.7, len(p2) - 0.3)
 ax.set_title(f"Hommikune ja õhtune tipuaeg ({n} ristmikku, all {len(hw_order)} maanteeloendurit)")
 save(fig, "06_2_03_tipptunnid")
@@ -329,6 +350,10 @@ ax.set_yticklabels([j.at[m, "silt"] for m in pj.index], fontsize=fs)
 ax.set_ylim(-0.7, len(pj) - 0.3)
 ax.set_xlabel("Tipuaja muutus lühikese koolivaheaja ajal, min (vs 2 nädalat enne ja pärast, samad lävendid)")
 ax.set_title("Lühikese koolivaheaja mõju tipuaja pikkusele ristmike kaupa")
+pb = cmpd.groupby(["vaheaeg_algus", "tipp"])[["muutus_min", "tipp15_muutus_%"]].median().unstack("tipp")
+for d, r in pb.iterrows():                         # vaheaegade kaupa (ristmike mediaan), nagu tekstis
+    ax.plot([], [], ls="", label=f"{d:%m.%Y}: hommikune tipuaeg {r[('muutus_min', 'hommik')]:+.0f} min, suurim veerandtund "
+            f"{r[('tipp15_muutus_%', 'hommik')]:+.0f}%; õhtune tipuaeg {r[('muutus_min', 'ohtu')]:+.0f} min")
 ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.06 if len(pj) > 30 else -0.13), ncol=1, fontsize=8)
 save(fig, "06_2_04_koolivaheajad_ristmikud")
 
@@ -429,6 +454,88 @@ ax.set_ylim(0, v[xs].max() * 1.12)
 ax.set_title(f"Hajutamise näide: {j.at[top, 'code']} {j.at[top, 'name']} (hommik, tüüpiline tööpäev)")
 ax.legend(loc="lower right", fontsize=8.5)
 save(fig, "06_2_06_hajutamine_naide")
+
+
+def lame_tipp(v, lo, hi, osa):
+    """Tipp lõigatakse tasemele (1 - osa) x tipp; lõigatud sõidukid täidavad lähimad madalamad pilud selle tasemeni."""
+    cap = v[lo:hi].max() * (1 - osa)
+    new = v.copy()
+    yle = np.flatnonzero(v[lo:hi] > cap) + lo
+    jaak = (v[yle] - cap).sum()
+    new[yle] = cap
+    kaugus = np.abs(np.arange(len(v))[:, None] - yle[None]).min(axis=1)
+    for d in range(1, len(v)):
+        pilud = sorted(np.flatnonzero((kaugus == d) & (new < cap)), key=lambda i: cap - new[i])
+        for k, i in enumerate(pilud):                       # võrdsel kaugusel pooleks, väiksem auk enne täis
+            lisa = min(cap - new[i], jaak / (len(pilud) - k))
+            new[i] += lisa
+            jaak -= lisa
+        if jaak < 1e-9:
+            return new, cap, d
+    raise ValueError("lõigatud sõidukid ei mahu päeva")
+
+
+# 06_2_06b: linna sisse suunduv liiklus (LSS) ristmikul, kus sisse suunduvate kanalite kiirus langeb hommikul kõige rohkem
+# (mõlemat suunda vähemalt 5% liiklusest; mõõdetud kiirus, logija nädala tööpäevad). Hommikune tipp lõigatakse tasemele,
+# mil LSS kiirus polnud veel langenud.
+veh = load_vehicles(None)
+sv = veh[(veh.kiirus > 0) & veh.ts.dt.normalize().isin(LOGIJA_NADAL)]
+sv = sv.assign(slot=sv.ts.dt.hour * PH + sv.ts.dt.minute // 15)
+kiir = {s: sv[sv[s]].groupby(["mp_id", "slot"])["kiirus"].mean().unstack().reindex(columns=range(96)) for s in ("LSS", "LVS")}
+tavak = {s: k.iloc[:, 6 * PH:20 * PH].median(axis=1) for s, k in kiir.items()}   # tavakiirus nagu tipuaja määratluses
+lang = {s: (1 - k.iloc[:, 6 * PH:10 * PH].min(axis=1) / tavak[s]) * 100 for s, k in kiir.items()}   # hommikune langus, %
+osad = veh.groupby("mp_id")[["LSS", "LVS"]].mean()
+sobiv = osad.index[(osad.min(axis=1) >= 0.05) & osad.index.isin(prof.index)]
+mb = lang["LSS"].reindex(sobiv).idxmax()
+print("06_2_06b valik (hommikune kiiruse langus kell 6-10, %):\n",
+      pd.DataFrame({"LSS": lang["LSS"], "LVS": lang["LVS"]}).reindex(sobiv).rename(index=j["code"])
+      .sort_values("LSS", ascending=False).head(5).round(1).to_string())
+lss = prof.loc[mb].to_numpy() * direction_share(veh, "LSS")[0].query("mp_id == @mb").set_index("slot")["osa"] \
+    .reindex(range(96)).to_numpy()
+sp, tav = kiir["LSS"].loc[mb].to_numpy(), tavak["LSS"][mb]
+lo, hi = (h * PH for h in TIPUAJA_ALA["hommik"])
+i_tipp = lo + lss[lo:hi].argmax()
+i_vaba = max(i for i in range(lo, i_tipp) if sp[i] >= tav)     # viimane pilu enne tippu, kus kiirus pole alla tavalise
+lõige = 1 - lss[i_vaba] / lss[i_tipp]
+new, cap, d_max = lame_tipp(lss, lo, hi, lõige)
+assert abs(new.sum() - lss.sum()) < 1e-6 and new[lo:hi].max() <= cap + 1e-9 and np.isclose(cap, lss[i_vaba])
+ala = np.arange(len(lss))
+lõik = (lss - new).clip(0)
+varem, hiljem = (new - lss).clip(0) * (ala < i_tipp), (new - lss).clip(0) * (ala > i_tipp)
+r = np.isclose(new, cap)
+pa_, pb = i_tipp, i_tipp + 1                                   # tasane osa = tipu ümber katkematult uue tipu tasemel
+while r[pa_ - 1]:
+    pa_ -= 1
+while r[pb]:
+    pb += 1
+kell = lambda i: hhmm(i / PH).lstrip("0").replace(":", ".")
+print(f"06_2_06b {j.at[mb, 'code']} LSS: tavakiirus {tav:.1f} km/h; kell {kell(i_vaba)} {sp[i_vaba]:.1f} km/h, "
+      f"{kell(i_vaba + 1)} {sp[i_vaba + 1]:.1f} km/h, LVS hommikune langus {lang['LVS'][mb]:.1f}%, tipus {kell(i_tipp)} {sp[i_tipp]:.1f} km/h; tipp {lss[i_tipp]:.0f} -> "
+      f"{cap:.0f} sõid/15 min (-{lõige * 100:.1f}%); nihkub {lõik.sum():.0f} sõid ({lõik.sum() / lss[lo:hi].sum() * 100:.1f}% "
+      f"hommiku LSS liiklusest kell 5-12), varem {varem.sum():.0f}, hiljem {hiljem.sum():.0f}; tasane osa "
+      f"{kell(pa_)}-{kell(pb)} ({(pb - pa_) * 15} min), täidetud kuni {d_max * 15} min enne/pärast "
+      f"lõigatud veerandtunde")
+fig, ax = plt.subplots(figsize=(9, 4.5))
+xs = slice(4 * PH, max(12 * PH, np.flatnonzero(~np.isclose(new, lss)).max() + 2))
+xx, vv, nn = X[xs], lss[xs], new[xs]
+ax.fill_between(xx, nn, vv, where=vv > nn, interpolate=True, color=C_RED, alpha=0.3, lw=0,
+                label=f"Tipust ära: {lõik.sum():,.0f} sõidukit".replace(",", " "))
+ax.fill_between(xx, vv, nn, where=nn > vv, interpolate=True, color=C_GREEN, alpha=0.3, lw=0,
+                label=f"Siia: {varem.sum():,.0f} varem ja {hiljem.sum():,.0f} hiljem".replace(",", " "))
+ax.plot(xx, vv, color=TEXT2, lw=2.2, label=f"Praegu: tipp {lss[i_tipp]:,.0f} sõidukit 15 min kohta".replace(",", " "))
+ax.plot(xx, nn, color=C_GREEN, lw=1.8, label=f"Tipp {lõige * 100:.0f}% madalam: {cap:,.0f} sõidukit kell {kell(pa_)}–{kell(pb)}"
+        .replace(",", " "))
+ax.plot(X[i_vaba], lss[i_vaba], "o", color=TEXT2, ms=6, zorder=5)
+ax.annotate(f"kell {kell(i_vaba)}–{kell(i_vaba + 1)} sõidavad\nlinna sisse veel tavakiirusel\n({sp[i_vaba]:.0f} km/h, "
+            f"tavaliselt {tav:.0f} km/h)", (X[i_vaba], lss[i_vaba]), xytext=(4.1, lss[i_tipp] * 0.9), fontsize=8.5,
+            color=TEXT2, bbox=dict(fc="white", ec="none", pad=1), arrowprops=dict(arrowstyle="-", color=TEXT2, lw=0.8))
+ax.set_xlabel("Kellaaeg")
+ax.set_ylabel("Linna sisse sõidukeid 15 min kohta")
+ax.set_ylim(0, lss[xs].max() * 1.12)
+ax.set_title(f"Lame tipp: {j.at[mb, 'code']} {j.at[mb, 'name']}, linna sisse (hommik), tipp kella {kell(i_vaba)} "
+             f"tasemele")
+ax.legend(loc="lower right", fontsize=8.5)
+save(fig, "06_2_06b_lame_tipp")
 
 # --- 06_2_07: ristmike koormus oma tipptunnil ja tipuajal (täis tsüklites liikunud sõidukite osakaal, 10) ----------
 K = pd.read_csv(OUT_DIR / "10_kullastus.csv").set_index("mp")                 # logija nädala tööpäevade keskmine

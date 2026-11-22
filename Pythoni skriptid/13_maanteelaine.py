@@ -411,8 +411,13 @@ else:
         save(fig, "13_03_aeglus")
         fig, ax = plt.subplots(figsize=(9, 5))                    # 13_03b: kõige sagedamini aeglane suund eraldi
         naide(ax, naited[0])
+        r0 = ak.loc[naited[0]]                             # tekstis toodud näitajad
         ax.set_title(silt(naited[0]) + " - tüüpiline tööpäev\nsinine = sagedus, oranž = kiirus (katkendjoon = aeglaseim "
-                     "10% päevi), punane vöönd = aeglane vähemalt 25% päevadest", fontsize=10, loc="left")
+                     "10% päevi),\npunane vöönd = aeglane vähemalt 25% päevadest; aeglane "
+                     f"{r0.aeglaseid_paevi} tööpäeval {r0.toopaevi}-st ({r0.osa_paevadest_pct:.0f}%)\nalgus tavaliselt "
+                     f"{hhmm(r0.algus_mediaan_h)}, kestus {r0.kestus_mediaan_min:.0f} min (pikim {r0.pikim_min:.0f}), kiirus "
+                     f"{r0.kiirus_mediaan:.0f} km/h (vaba {r0.tavakiirus:.0f}), sagedus {r0.vool_pct:.0f}% tavalisest tipust",
+                     fontsize=9, loc="left")
         fig.tight_layout()
         save(fig, "13_03b_aeglaseim")
 
@@ -477,7 +482,8 @@ ax.set_yticklabels([f"{n} (tõus {hhmm(eel.loc[eel['loendur'] == n, 'maantee_tou
                     for n in jarj.index], fontsize=8)
 ax.set_xlabel("Edumaa, min (punkt = manööver, kriips = mediaan)")
 ax.set_title(f"Maantee kui eelhoiatus: edumaa enne ummiku algust\n(maantee {mt['paev'].nunique()} "
-             f"tööpäeva, ummikud {um['paev'].nunique()} tööpäeva)", fontsize=10)
+             f"tööpäeva, ummikud {um['paev'].nunique()} tööpäeva; kõigi manöövrite mediaan {eel['edumaa_min'].median():.0f} min, "
+             f"kvartiilid {eel['edumaa_min'].quantile(.25):.0f}–{eel['edumaa_min'].quantile(.75):.0f})", fontsize=10)
 if pv is not None:
     ax = axes[0, 1]
     ax.scatter(pv["maantee_varem_min"], pv["ummik_varem_min"], s=16, color=C_BLUE, alpha=0.6, edgecolor="none")

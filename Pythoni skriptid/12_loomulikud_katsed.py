@@ -205,14 +205,18 @@ for ax, osakaal in zip(axes[0], [False, True]):
     ax.set_title("Sama, osakaaluna ööpäevast (aastane kasv maha arvatud)" if osakaal else
                  f"Hommikune liiklus septembris, {len(uhised)} ristmikku kokku", fontsize=11)
     ax.legend(fontsize=9, title="hall = kooli algus varem 07:45–09:00\nkatkendjoon = kell 9", title_fontsize=7.5)
+kvm = kv.set_index(["paar", "naitaja"])               # tekstis toodud paari kokkuvõte (n, akende osakaal, keskaeg)
+km = lambda p, c, d: f"{kvm.at[(p, c), 'mediaan']:+.{d}f}".replace(".", ",")
+silt = lambda p: (f"{p} ({kvm.at[(p, 'keskaeg_min'), 'n']:.0f} ristmikku; 6.00–7.30 {km(p, 'osa_0600_0730_pp', 2)}, "
+                  f"8.30–9.30 {km(p, 'osa_0830_0930_pp', 2)} pp; keskaeg {km(p, 'keskaeg_min', 1)} min)")
 for ax, liik, yl in zip(axes[1], ["toores", "puhas"], ["Muutus, %", "Muutus, protsendipunkti"]):
     pv, pe = (pilud[pilud["paar"] == p].set_index("slot") for p in (viimane, eelmine))
     xs = pv.index / 4
-    ax.bar(xs, pv[f"{liik}_mediaan"], width=0.21, align="edge", color=C_ORANGE, alpha=0.9, label=viimane,
+    ax.bar(xs, pv[f"{liik}_mediaan"], width=0.21, align="edge", color=C_ORANGE, alpha=0.9, label=silt(viimane),
            yerr=[pv[f"{liik}_mediaan"] - pv[f"{liik}_uv_alumine"], pv[f"{liik}_uv_ylemine"] - pv[f"{liik}_mediaan"]],
            error_kw=dict(lw=0.6, ecolor=TEXT2))
     ax.step(np.r_[pe.index / 4, pe.index[-1] / 4 + 0.25], np.r_[pe[f"{liik}_mediaan"], pe[f"{liik}_mediaan"].iloc[-1]],
-            where="post", color=C_BLUE, lw=1.6, label=f"{eelmine} (võrdluseks)")
+            where="post", color=C_BLUE, lw=1.6, label=silt(eelmine) + " võrdluseks")
     ax.axhline(0, color=TEXT2, lw=0.6)
     ax.axvline(9, color=TEXT2, lw=0.8, ls="--")
     ax.set_xlim(5, 20)
@@ -221,7 +225,7 @@ for ax, liik, yl in zip(axes[1], ["toores", "puhas"], ["Muutus, %", "Muutus, pro
     ax.set_ylabel(yl)
     ax.set_title("Toores vahe: liikluse muutus pilus" if liik == "toores" else
                  "Puhas vahe: ööpäeva liikluse muutus maha arvatud", fontsize=11)
-    ax.legend(fontsize=9, loc="lower right")
+    ax.legend(fontsize=7.5, loc="upper right")
 fig.suptitle(f"Koolipäeva algus kell 9 (alates 1.09.2026): tööpäevad {AKEN[0]}.–{AKEN[1]}. septembril",
              x=0.01, ha="left", fontweight="bold")
 fig.tight_layout()
@@ -423,7 +427,10 @@ ax.set_xticklabels([f"{pd.Timestamp(v):%m.%Y}" for v in vh["vaheaeg_algus"]])
 ax.set_ylabel("Muutus, % (vs 2 nädalat enne ja pärast)")
 ax.set_ylim(min(-100, vh["aeg_taistasemel_%"].min() - 12), 16)
 ax.legend(fontsize=9, loc="upper right", ncol=2)
-ax.set_title(f"Lühikesed koolivaheajad, hommik ({RYHM} ristmikud)", fontsize=11)
+ax.set_title(f"Lühikesed koolivaheajad, hommik ({RYHM} ristmikud)\nmediaan: hommik liiklus "   # tekstis toodud
+             f"{vk.at['hommik', 'liiklus_%']:+.1f}%, tipptund {vk.at['hommik', 'tipptund_%']:+.1f}%, aeg "
+             f"{vk.at['hommik', 'aeg_taistasemel_%']:+.0f}%; õhtu liiklus {vk.at['õhtu', 'liiklus_%']:+.1f}%, aeg "
+             f"{vk.at['õhtu', 'aeg_taistasemel_%']:+.0f}%".replace(".", ","), fontsize=9.5)
 ax = axes[1, 1]
 if kalib is not None:
     for tipp, col in VARV.items():
@@ -464,4 +471,17 @@ ax.set_title(f"Hommik ({RYHM} ristmikud): väiksema liiklusega päeval on aeg t�
              "(vari = 95% usaldusvahemik)", fontsize=10, loc="left")
 fig.tight_layout()
 save(fig, "12_03b_vaike_muutus")
+
+with plt.rc_context({"font.size": 13, "axes.titlesize": 15, "xtick.labelsize": 13, "ytick.labelsize": 12}):
+    fig, ax = plt.subplots(figsize=(10, 5))                     # lihtne versioon (10-aastasele, vt 47): samad punktid
+    m = [juures(x, "indeks", p) for p in (100, 95, 90)]
+    ax.bar(["tavaline päev", "5% vähem autosid", "10% vähem autosid"], m, color=[C_GRAY, C_BLUE, C_BLUE], width=0.55)
+    for i, v in enumerate(m):
+        ax.text(i, v + 2, f"{v:.0f} min" + ("" if i == 0 else f" ({(v / m[0] - 1) * 100:+.0f}%)".replace("-", "−")),
+                ha="center", va="bottom", fontsize=15)
+    ax.set_ylim(0, m[0] * 1.25)
+    ax.set_ylabel("ristmik täis, min päevas")
+    ax.set_title("Kui autosid on veidi vähem, kui kaua on ristmik täis?\nVeidi vähem autosid, palju lühem täis aeg "
+                 "(hommik)", loc="left")
+    save(fig, "12_03b_10yo")
 print("Valmis.")

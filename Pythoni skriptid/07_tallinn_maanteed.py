@@ -321,12 +321,38 @@ for lisa, piir in [("", None)] + ([("p", PIIR)] if PIIR is not None else []):
     linnapaneel(ax, "Tallinn", piir)
     ax.set_xlabel("Kellaaeg")
     ax.set_ylabel("Osakaal ööpäeva liiklusest, % tunnis")
+    x = pt.loc[pt["suund"] == "sisse", "hommik_osakaal_%"] if piir is not None else None   # tekstis toodud mediaan
     ax.set_title(f"Tallinn: linna ristmikud ja {'linna piiriloendurid' if piir is not None else 'sissesõiduteed'}, "
-                 "tööpäeva tunniprofiil (E-R, september-mai, 2024-2026)", fontsize=10, loc="left")
+                 "tööpäeva tunniprofiil (E-R, september-mai, 2024-2026)"
+                 + (f"\nsissesõidu hommikune tipptund loenduskoha kaupa mediaanina {x.median():.1f}% ööpäevast "
+                    f"(vahemik {x.min():.1f}–{x.max():.1f}%)".replace(".", ",") if piir is not None else ""),
+                 fontsize=10, loc="left")
     if piir is not None:
         fig.text(0.01, 0.005, textwrap.fill(PIIR_LOEND, 130), fontsize=7.5, color=TEXT2, va="bottom")
     fig.tight_layout(rect=(0, 0.08 if piir is not None else 0, 1, 1))
     save(fig, f"07_01b{lisa}_tallinn")
+    if SUUND:                                                       # lihtne versioon ainult põhijooksul
+        continue
+    with plt.rc_context({"font.size": 13, "axes.titlesize": 15, "xtick.labelsize": 12, "ytick.labelsize": 12}):
+        fig, ax = plt.subplots(figsize=(10, 5))                    # lihtne versioon (10-aastasele, vt 47)
+        for suund, col, lab in [("sisse", C_BLUE, "linna"), ("välja", C_ORANGE, "linnast välja")]:
+            sub = (piir[piir.index.get_level_values("suund") == suund] if piir is not None else
+                   site_h[(site_h.index.get_level_values("linn") == "Tallinn") &
+                          (site_h.index.get_level_values("suund") == suund)])
+            y = share(sub).to_numpy()
+            i = int(np.argmax(y))
+            ax.plot(H, y, color=col, lw=3)
+            ax.annotate(f"{lab}: kõige rohkem\nkell {i}–{i + 1}", (H[i], y[i]), xytext=(-12 if i < 12 else 12, 8),
+                        textcoords="offset points", ha="right" if i < 12 else "left", color=col, fontsize=14,
+                        fontweight="bold")
+        ax.set_xticks(range(0, 25, 3))
+        ax.set_xlim(0, 24)
+        ax.set_ylim(0, ax.get_ylim()[1] * 1.2)
+        ax.set_xlabel("kell")
+        ax.set_ylabel("autosid tunnis, % päevast")
+        ax.set_title(f"Millal sõidavad autod Tallinna ja Tallinnast välja?\nHommikul linna, õhtul linnast välja "
+                     f"({'linna piiril' if piir is not None else 'maanteedel'})", loc="left")
+        save(fig, f"07_01b{lisa}_10yo")
 
 # 07_02_tipu_teravus: tipptunni osakaal ööpäevast ja teoreetiline hajutamise potentsiaal
 sites["grupp"] = sites["linn"] + "\n" + sites["suund"]

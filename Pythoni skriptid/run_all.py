@@ -108,6 +108,7 @@ RUNS = [(s, env) for s in SCRIPTS]
 RUNS += [(s, dict(env, SUUND=d, RES=r)) for d in ["LSS", "LVS"] for r in ["5", "15"]
          for s in ["07_tallinn_maanteed.py", "06_tallinn.py"]]
 RUNS += [("11_kontrollid.py", env)]          # arvukontrollid kõige lõpus (kasutab ka LSS/LVS väljundit)
+RUNS += [("47_lihtsad_joonised.py", env)]    # lihtsad joonised (10-aastasele) kõige viimasena, kasutab teiste tabeleid
 for s, e in RUNS:
     print(f"\n=== {s} {e.get('SUUND', '')} {e.get('RES', '')} ===", flush=True)
     t = time.time()

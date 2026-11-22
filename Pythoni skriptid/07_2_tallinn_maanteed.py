@@ -236,8 +236,11 @@ jn = load_junctions()
 kk = k.assign(**{f"{tp}_kestus_min": k[f"{tp}_kestus_min"].clip(upper=KAART_MAX) for tp in STS_AKNAD})
 harju_ids = set(loc.loc[loc.maakond == "Harju", "id"])
 mp_ = kk[(kk.tyyp == "ristmik") | kk.id.isin(harju_ids)]
+kiir = lambda i, tp: (f" (tipp {k.at[i, f'{tp}_tipu_kiirus_kmh']:.0f} km/h, tavaliselt {k.at[i, f'{tp}_tavakiirus_kmh']:.0f}; "
+                      f"sageduse järgi {int(k.at[i, f'{tp}_kestus_voog_min'])} min)"     # tekstis toodud aeglustus
+                      if k.at[i, "tyyp"] == "maantee" and k.at[i, f"{tp}_kiirus_tingimus"] else "")
 yle = lambda df: ", ".join(f"{r.id if r.tyyp == 'ristmik' else r.koht.split(' (')[0]} {tp[0].upper()} "
-                           f"{int(k.at[r.Index, f'{tp}_kestus_min'])} min"
+                           f"{int(k.at[r.Index, f'{tp}_kestus_min'])} min{kiir(r.Index, tp)}"
                            for tp in STS_AKNAD for r in df[k.loc[df.index, f"{tp}_kestus_min"] > KAART_MAX].itertuples())
 markus = lambda df: f" (üle {KAART_MAX} min: {yle(df)})" if yle(df) else ""
 timing_map(mp_, "07_2_02_kaart_harju", "Tipuaja kestus: kui kaua on liiklus sama aeglane või sama tihe kui tavalises "

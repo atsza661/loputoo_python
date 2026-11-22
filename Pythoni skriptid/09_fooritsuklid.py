@@ -172,7 +172,7 @@ import matplotlib.pyplot as plt
 
 from common import (tervetel_paevadel, load_vehicles, save, save_table, set_style, short_name, slot_label, hhmm, loigud, ummiku_loik, ummikumask,
                     seisakumask, X_LAHEDAL, KIIRUS_YLE, H_KRIITILINE_MIN,
-                    load_manoeuvres, ristmike_harud, haru, LINNA_KIIRUS, C_BLUE, C_ORANGE, C_GRAY, C_RED, TEXT2)
+                    load_manoeuvres, ristmike_harud, haru, LINNA_KIIRUS, C_BLUE, C_ORANGE, C_GRAY, C_RED, C_GREEN, TEXT2)
 
 # --- Seaded (kalibreeritavad) --------------------------------------------------------------------------
 TS = np.arange(40, 181)          # võimalikud kindla tsükli pikkused, s
@@ -650,7 +650,11 @@ if len(naited):
                f"{r.labilase_pct:.0f}% täistasemest, kiirus {r.kiirus:.0f} km/h (keskmine {r.kiirus_keskmine:.0f}), aeglasi "
                f"{r.aeglasi_pct:.0f}% ja seisvaid {r.seisvaid_pct:.0f}%")
     axes.flat[-1].set_xlabel("Kellaaeg (" + SELGITUS + ")")
-    fig.tight_layout()
+    fig.suptitle(f"Pikimad seisakud; kõigi {len(sei)} seisaku mediaan: läbilase {sei['labilase_pct'].median():.0f}% täistasemest, "   # tekstis toodud mediaanid
+                 f"kiirus {sei['kiirus'].median():.0f} km/h (manöövri keskmine {sei['kiirus_keskmine'].median():.0f}), aeglasi "
+                 f"{sei['aeglasi_pct'].median():.0f}% ja seisvaid {sei['seisvaid_pct'].median():.0f}%", x=0.01, ha="left",
+                 fontweight="bold")
+    fig.tight_layout(rect=(0, 0, 1, 1 - 0.5 / fig.get_figheight()))       # ruum kaherealisele pealkirjale
     save(fig, "09_03_seisakud")
     r = naited.iloc[0]                                          # 09_03b: pikim seisak eraldi
     fig, ax = plt.subplots(figsize=(12, 3.4))
@@ -835,3 +839,153 @@ a.set_title(f"b) Tegelikud plokid vs juhuslik liiklus ({len(valim):,} plokki)".r
             fontsize=10)
 fig.tight_layout()
 save(fig, "09_07b_tsukli_kontroll")
+
+# --- Lihtsad joonised (<nr>_10yo, vt 47): samad andmed, üks sõnum, suur kiri ------------------------------------------
+plt.rcParams.update({"font.size": 13, "axes.titlesize": 15, "axes.labelsize": 13, "xtick.labelsize": 12,
+                     "ytick.labelsize": 12})
+VARVID = "roheline = autod mahuvad läbi, hall = ristmik on täis (ummik), punane = autod seisavad"
+kellaks = lambda ax: ax.xaxis.set_major_formatter(lambda x, _: slot_label(x * 60, 60))
+
+
+def triibud(ridu, fail, kysimus, xlim=None):
+    """Iga rida = üks manööver ja päev: tsüklid kellaaja teljel värvitud olekuga (vaba, täis, seisak)."""
+    fig, ax = plt.subplots(figsize=(12, 0.7 * len(ridu) + 2.2))
+    for i, (d, _) in enumerate(ridu):
+        h, pikk = d["t"].to_numpy() / 3600, d["T"].to_numpy() / 3600
+        sei_, umm = d["seisak"].to_numpy(bool), d["ummikus"].to_numpy(bool)
+        for m, col, al in [(~sei_ & ~umm, C_GREEN, 0.35), (umm & ~sei_, C_GRAY, 0.9), (sei_, C_RED, 0.9)]:
+            ax.barh(np.full(m.sum(), i), pikk[m], left=h[m], color=col, alpha=al, height=0.7, lw=0)
+    ax.set_yticks(range(len(ridu)), [s for _, s in ridu], fontsize=10)
+    ax.invert_yaxis()
+    ax.grid(axis="y", visible=False)
+    if xlim:
+        ax.set_xlim(*xlim)
+    kellaks(ax)
+    ax.set_title(f"{kysimus}\n{VARVID}", loc="left", fontsize=13)
+    fig.tight_layout()
+    save(fig, fail)
+
+
+silt = lambda r: f"{r.mp} {short_name(r.manoeuvre, 24)}\n{r.paev:%d.%m.%Y}"
+for fail, meetod, k in [("09_01_10yo", "kindel", "kindla tsükliga foor"), ("09_02_10yo", "paus", "nutifoor")]:
+    naited = stab[stab["meetod"] == meetod].sort_values("kestus_min", ascending=False).drop_duplicates(VOTI).head(6)
+    if len(naited):
+        triibud([(paeva_osa(r, r.algus_h - 1.5, r.lahenes_h + 1.5), silt(r)) for r in naited.itertuples()], fail,
+                f"Millal olid ristmikud täis? Pikimad ummikud ({k})")
+naited = sei[sei["tipp"] != "muu aeg"].sort_values("kestus_min", ascending=False).drop_duplicates(VOTI).head(8)
+if len(naited):
+    triibud([(paeva_osa(r, r.algus_h - 1.5, r.lopp_h + 1.5), silt(r)) for r in naited.itertuples()], "09_03_10yo",
+            "Millal autod seisid? Pikimad seisakud")
+
+r1 = stab[stab["meetod"] == "kindel"].sort_values("kestus_min", ascending=False).iloc[0]   # sama näide nagu 09_01b
+dd = c[(c["mp_id"] == r1.mp_id) & (c["paev"] == r1.paev)]
+triibud([(d, short_name(man.at[(r1.mp_id, did), "manoeuvre"], 34)) for did, d in dd.groupby("direction_id")],
+        "09_04_10yo", f"Üks ristmik terve päeva: {short_name(man.at[(r1.mp_id, r1.direction_id), 'intersection'], 40)}, "
+                      f"{r1.paev:%d.%m.%Y}. Iga rida on üks sõidusuund", xlim=KELL)
+
+d = paeva_osa(r1, r1.algus_h - 1.5, r1.lahenes_h + 1.5)
+h = d["t"] / 3600
+fig, ax = plt.subplots(figsize=(11, 5))
+for a, b in loigud(d["ummikus"].values, 0):
+    ax.axvspan(h.iloc[a], h.iloc[b - 1] + d["T"].iloc[b - 1] / 3600, color=C_GRAY, alpha=0.3, lw=0)
+ax.plot(h, sile(d["n"]), color=C_BLUE, lw=2.5)
+taid = ALGUS * d["taistase"] * d["T"] / 3600
+ax.plot(h, taid, color=TEXT2, lw=1.5, ls="--")
+ax.text(h.iloc[-1], taid.iloc[-1] * 1.03, f"peaaegu täis ({ALGUS:.0%})", ha="right", va="bottom", color=TEXT2, fontsize=13)
+ax.text(r1.algus_h + (r1.lahenes_h - r1.algus_h) / 2, 0.08 * taid.max(), "ummik", ha="center", fontsize=16,
+        fontweight="bold", color=TEXT2)
+ax.set_ylim(0, max(sile(d["n"]).max(), taid.max()) * 1.25)
+ax.set_ylabel("autosid ühe rohelise tule ajal")
+kellaks(ax)
+ax.set_title(f"Millal on ristmik ummikus? Näide: {r1.mp}, {r1.paev:%d.%m.%Y}\nKui igal rohelisel sõidab läbi peaaegu "
+             "nii palju autosid kui mahub (sinine joon)", loc="left")
+save(fig, "09_01b_10yo")
+
+r3 = naited.iloc[0]                                                     # sama näide nagu 09_03b
+d = paeva_osa(r3, r3.algus_h - 1.5, r3.lopp_h + 1.5)
+h = d["t"] / 3600
+fig, ax = plt.subplots(figsize=(11, 5))
+for a, b in loigud(d["seisak"].values, 0):
+    ax.axvspan(h.iloc[a], h.iloc[b - 1] + d["T"].iloc[b - 1] / 3600, color=C_RED, alpha=0.25, lw=0)
+ax.plot(h, d["kiirus_sile"], color=C_ORANGE, lw=2.5)
+ax.axhline(r3.kiirus_keskmine, color=TEXT2, lw=1.5, ls="--")
+ax.text(h.iloc[0], r3.kiirus_keskmine * 1.03, "tavaline kiirus", va="bottom", color=TEXT2, fontsize=13)
+ax.set_ylim(0, max(d["kiirus_sile"].max(), r3.kiirus_keskmine) * 1.3)
+ax.set_ylabel("kiirus, km/h")
+kellaks(ax)
+ax.set_title(f"Kõige pikem seisak: autod liikusid aeglaselt (punane)\n{r3.mp}, {r3.paev:%d.%m.%Y} kell {r3.algus}–{r3.lopp}: "
+             f"kiirus {r3.kiirus:.0f} km/h tavalise {r3.kiirus_keskmine:.0f} km/h asemel", loc="left")
+save(fig, "09_03b_10yo")
+
+if len(vabad):
+    key, r5 = next(iter(vabad.iterrows()))                              # sama näide nagu 09_05 esimene rida
+    d = c[(c["mp_id"] == key[0]) & (c["direction_id"] == key[1])]
+    d = d[d["tyyp"] == "tööpäev"] if (d["tyyp"] == "tööpäev").any() else d
+    kiirus = d.pivot(index="t", columns="paev", values="kiirus_sile").median(axis=1)
+    h = kiirus.index / 3600
+    fig, ax = plt.subplots(figsize=(11, 5))
+    ax.plot(h, kiirus, color=C_ORANGE, lw=2.5)
+    ax.axhline(VABA_KIIRUS * r5["vaba_kiirus"], color=TEXT2, lw=1.5, ls="--")
+    ax.text(h[-1], VABA_KIIRUS * r5["vaba_kiirus"] * 0.95, "allpool on aeglane", ha="right", va="top", color=TEXT2,
+            fontsize=13)
+    ax.set_ylim(0, kiirus.max() * 1.25)
+    ax.set_xticks(range(KELL[0], KELL[1] + 1, 2))
+    ax.set_ylabel("kiirus, km/h")
+    ax.set_xlabel("kell")
+    ax.set_title(f"Kas autod saavad sõita ilma foorita?\n{r5['mp']} {short_name(r5['manoeuvre'], 50)}: tavalise "
+                 "tööpäeva kiirus", loc="left")
+    save(fig, "09_05_10yo")
+
+if ryhmad:
+    fig, ax = plt.subplots(figsize=(11, 5))
+    for ryhm, col, nimi_ in [("foor", C_BLUE, "fooriga suund"), ("vaba vool", C_GREEN, "vaba vooluga suund")]:
+        if ryhm in ryhmad:
+            k = kokku.loc[(ryhm, "hommik")].reindex(X)["voit_kmh"]
+            ax.plot(range(len(X)), k.values, "o-", color=col, lw=2.5, ms=7)
+            ax.text(len(X) - 0.9, k.values[-1], nimi_, color=col, fontsize=14, fontweight="bold", va="center")
+    ax.axvspan(3.3, 3.7, color=C_GRAY, alpha=0.5, lw=0)
+    ax.text(3.5, ax.get_ylim()[1] * 0.97, "ummik", ha="center", va="top", fontsize=13, color=TEXT2,
+            bbox=dict(fc="white", ec="none", alpha=0.85))
+    ax.axhline(0, color=TEXT2, lw=0.8)
+    ax.set_xticks(range(len(X)), [f"{abs(x)} min\nenne" if x < 0 else f"{x} min\npärast" for x in X])
+    ax.set_xlim(-0.5, len(X) + 1.9)
+    ax.set_ylabel("kiiremini kui ummikus, km/h")
+    ax.set_title("Kas loenduri kiirus näitab ummikut? (hommik)\nFooriga suunal on kiirus enne, ajal ja pärast "
+                 "ummikut peaaegu sama", loc="left")
+    save(fig, "09_06_10yo")
+
+x, rida = (t_n - piir) % T_n, (t_n - piir) // T_n                      # 09_07 õige pikkus, esimesed 12 tsüklit
+rida = rida - rida.min() + 1
+m = rida <= 12
+lo, hi = np.percentile(x, [1, 99])
+fig, ax = plt.subplots(figsize=(11, 5.5))
+ax.axvspan(lo, hi, color=C_GREEN, alpha=0.15, lw=0)
+for a, b in [(0, lo), (hi, T_n)]:
+    ax.axvspan(a, b, color=C_RED, alpha=0.15, lw=0)
+ax.scatter(x[m], rida[m], marker="|", s=160, lw=2, color=C_BLUE)
+ax.text((lo + hi) / 2, 0.2, "roheline tuli", ha="center", fontsize=14, color=TEXT2)
+for xx in (lo / 2, (hi + T_n) / 2):
+    ax.text(xx, 0.2, "punane", ha="center", fontsize=14, color=TEXT2)
+ax.set_xlim(0, T_n)
+ax.set_ylim(12.8, -0.6)
+ax.set_yticks(range(1, 13))
+ax.grid(axis="y", visible=False)
+ax.set_xlabel("sekundit tsükli algusest")
+ax.set_ylabel("tsükkel")
+ax.set_title(f"Kuidas leida foori tsükkel? Autod tulevad salkadena ({T_n} s tagant)\nIga rida on üks tsükkel, kriips = üks "
+             "auto. Tühi koht = punane tuli", loc="left")
+save(fig, "09_07_10yo")
+
+v = [100 * osa.at["sama", "sama ristmik"], 100 * osa.at["sama", "eri ristmikud"],
+     100 * (valim["kontrast"].values > np.quantile(juhus, 0.99)).mean()]
+fig, ax = plt.subplots(figsize=(11, 4.8))
+ax.barh(range(3), v, color=[C_BLUE, C_GRAY, C_BLUE], height=0.55)
+for i, x_ in enumerate(v):
+    ax.text(x_ + 1, i, f"{x_:.0f} korda 100-st", va="center", fontsize=14)
+ax.set_yticks(range(3), ["sama ristmiku kaks suunda\nleidsid sama tsükli", "eri ristmike kaks suunda\nleidsid sama tsükli",
+                         "tsükkel oli selgem kui\njuhuslikul liiklusel"])
+ax.invert_yaxis()
+ax.set_xlim(0, 125)
+ax.grid(axis="y", visible=False)
+ax.set_title("Kas tsükli leidmine töötab?\nÜhel ristmikul on üks foorikell, seega peaks tsükkel olema sama", loc="left")
+save(fig, "09_07b_10yo")

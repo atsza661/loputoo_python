@@ -26,7 +26,8 @@ ANALÜÜSID: ARVUTUS JA VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas v
                            kaupa, märgitud hommiku ja õhtu suurim väärtus.
      10_03_kullastus_kaart.png   kaks kaarti ortofototaustal (hommik, õhtu). Värviline ring = ristmik, selle pikim
                               stabiilne ummik: värv = ummiku algus (hilisem = tumedam), suurus = kestus (tööpäevade
-                              mediaan). Väike valge ring = stabiilset ummikut pole.
+                              mediaan). Väike valge ring = stabiilset ummikut pole. Pealkirjas kõigi kindla tsükliga
+                              manöövrite stabiilse ummiku kestuse mediaan (tööpäevad).
      10_kullastus.csv
   3) Päevade võrdlus. Manöövri ummiku alguse ja lahenemise vähim, mediaan, suurim ja standardhälve (min) üle tööpäevade.
      10_04_paevade_vordlus.png   (vajab >= 2 tööpäeva) rida = manööver ja tipp, x-telg = kellaaeg. Sinine punkt = ummiku
@@ -170,7 +171,7 @@ from matplotlib.colors import LinearSegmentedColormap
 
 from common import (tervetel_paevadel, load_vehicles, load_junctions, add_basemap, to_merc, save, save_table, set_style, short_name,
                     slot_label, OUT_DIR, load_manoeuvres, X_LAHEDAL, KIIRUS_YLE, PIKKUS, PIKKUS_PIIRID, PIKKUS_KLASS, PIKKUS_LABEL,
-                    C_BLUE, C_ORANGE, C_AQUA, C_GRAY, C_RED, TEXT2)
+                    C_BLUE, C_ORANGE, C_AQUA, C_GRAY, C_RED, TEXT, TEXT2)
 
 HOOGA = KIIRUS_YLE    # hooga läbija: kiirus üle 70% manöövri kiiruste 85. protsentiilist (üle kiiruse läbilaskevõimel, HCM)
 JARJEKORD_VAHE = 1.9 + 2.0   # järjekorras seni, kuni vahe eelmisega <= küllastusvahe + suurim stardikadu (HCM 2000 lk 8-27)
@@ -341,7 +342,9 @@ for ax, (tipp, cmap) in zip(axes, [("hommik", "Blues"), ("õhtu", "Oranges")]):
     ax.scatter([], [], s=16, c="white", edgecolor="black", linewidth=0.6, label="stabiilset ummikut pole")
     ax.legend(loc="upper left", fontsize=8, title="Ummiku kestus", title_fontsize=8, frameon=True, framealpha=0.85,
               labelspacing=1.1, borderpad=0.9)
-    ax.set_title(f"{tipp.capitalize()}: {int(on.sum())} ristmikul stabiilne ummik", fontsize=11)
+    kmed = um.loc[um["tipp"].str.contains(tipp) & (um["meetod"] == "kindel"), "kestus_min"].median()
+    ax.set_title(f"{tipp.capitalize()}: {int(on.sum())} ristmikul stabiilne ummik\nkindla tsükliga manöövri ummik "
+                 f"mediaanina {kmed:g} min".replace(".", ","), fontsize=11)
 fig.suptitle("Iga ristmiku pikim ummik: värv = algus, suurus = kestus (tööpäevade mediaan)", x=0.01, ha="left",
              fontweight="bold")
 save(fig, "10_03_kullastus_kaart")
@@ -597,7 +600,7 @@ axes[0].set_xlim(0, None)
 axes[0].set_ylim(0, None)
 axes[0].set_xlabel("Tihedus, sõidukit km kohta rajal (punktkiirustest)")
 axes[0].set_ylabel("Sagedus, sõidukit tunnis rajal")
-axes[0].set_title(f"Klassikaline diagramm: sagedus kasvab tihedusega lõpuni\n(r = {r_vk:.2f}; loendurid on stoppjoonel ja "
+axes[0].set_title(f"Klassikaline diagramm: sagedus kasvab tihedusega lõpuni\n(r = {str(round(r_vk, 3)).replace('.', ',')}; loendurid on stoppjoonel ja "
                   "järjekorda ei näe)", fontsize=10)
 axes[1].scatter(kd["labilase_%"], kd["tais_%"], c=kd["viis"] / 12, cmap="viridis", vmin=6, vmax=20, s=12, alpha=0.8)
 xx = np.array([kd["labilase_%"].min(), x0, kd["labilase_%"].max()])
@@ -902,3 +905,86 @@ ax.set_title(f"Järjekorra esimene sõiduauto peatub {peatus(vm, KIIRENDUS[0]):.
 fig.tight_layout()
 save(fig, "10_12_seisak_jarjekord")
 print("Valmis.")
+
+# --- Lihtsad joonised (<nr>_10yo, vt 47): samad andmed, üks sõnum, suur kiri ------------------------------------------
+plt.rcParams.update({"font.size": 13, "axes.titlesize": 15, "axes.labelsize": 13, "xtick.labelsize": 12,
+                     "ytick.labelsize": 12})
+X_SILT, Y_SILT = "kui palju autosid linnas liigub, % suurimast", "autosid täis ristmikul, %"
+fig, ax = plt.subplots(figsize=(10, 5.2))
+ax.scatter(kd["labilase_%"], kd["tais_%"], s=10, color=C_GRAY, alpha=0.5, lw=0)
+xx = np.array([kd["labilase_%"].min(), x0, kd["labilase_%"].max()])
+ax.plot(xx, a0 + b0 * np.clip(xx - x0, 0, None), color=C_ORANGE, lw=3)
+ax.axvline(x0, color=C_ORANGE, lw=1.2, ls="--")
+ax.text(x0 - 1, kd["tais_%"].max() * 0.9, f"{x0:.0f}%", ha="right", fontsize=15, color=C_ORANGE, fontweight="bold")
+ax.set_ylim(0, None)
+ax.set_xlabel(X_SILT)
+ax.set_ylabel(Y_SILT)
+ax.set_title(f"Millal hakkab linn täis saama?\nKuni {x0:.0f}% on ristmikud enamasti vabad, siis täituvad kiiresti",
+             loc="left")
+save(fig, "10_09_10yo")
+
+fig, ax = plt.subplots(figsize=(10, 5.2))
+louna = next((h for h in (12, 13, 11) if h in tj["tund"].values and tj.set_index("tund").notna().at[h, "tous_b"]), 12)
+xs = np.linspace(kd["labilase_%"].min(), 100, 60)
+for h, col, nimi in [(8, C_BLUE, "hommikul kell 8"), (louna, C_GRAY, f"päeval kell {louna}"), (17, C_ORANGE, "õhtul kell 17")]:
+    r_ = tj.set_index("tund").loc[h]
+    y_ = np.full_like(xs, r_.tase_a) if np.isnan(r_.tous_b) else np.minimum(r_.tase_a + r_.tous_b * np.clip(xs - x0, 0, None), 100)
+    ax.plot(xs, y_, color=col, lw=3)
+    ax.text(101, y_[-1], nimi, color=col, fontsize=14, fontweight="bold", va="center")
+ax.set_xlim(right=125)
+ax.set_ylim(0, None)
+ax.set_xlabel(X_SILT)
+ax.set_ylabel(Y_SILT)
+ax.set_title("Kas hommikul saavad ristmikud kiiremini täis?\nJah: sama liikluse juures on hommikul rohkem autosid täis "
+             "ristmikul", loc="left")
+save(fig, "10_10_10yo")
+
+fig, ax = plt.subplots(figsize=(10, 5.5))
+ax.axhspan(lo, hi, color=C_GRAY, alpha=0.2, lw=0)
+ax.scatter(g.loc[~g["seisak"], "hoivatus_%"], g.loc[~g["seisak"], "vool"], s=14, color=C_BLUE, alpha=0.35, lw=0)
+ax.scatter(s9["hoivatus_%"], s9["vool"], s=22, color=C_RED, alpha=0.8, lw=0)
+mv = g[~g["seisak"] & g["vool"].between(lo, hi)]["hoivatus_%"].median()
+ms = s9[s9["vool"].between(lo, hi)]["hoivatus_%"].median()
+for m_, col, tekst in [(mv, C_BLUE, "autod sõidavad\nvabalt"), (ms, C_RED, "autod seisavad\njärjekorras")]:
+    ax.annotate(tekst, (m_, hi), xytext=(0, 10), textcoords="offset points", ha="center", fontsize=14, color=col,
+                fontweight="bold", bbox=dict(fc="white", ec="none", alpha=0.85))
+ax.set_ylim(0, g["vool"].max() * 1.3)
+ax.set_xlim(0, g["hoivatus_%"].quantile(0.999) * 1.05)
+ax.set_xlabel("kui suure osa ajast oli loenduri all auto, %")
+ax.set_ylabel("autosid tunnis")
+ax.set_title(f"Sama palju autosid, kaks eri olukorda (hall triip)\n{nimi9}", loc="left")
+save(fig, "10_11b_10yo")
+
+fig, ax = plt.subplots(figsize=(10, 5.5))
+ax.plot([0, 1], [0, 1], color=C_BLUE, lw=4)
+ax.plot([1, 4.5], [1, 0], color=C_RED, lw=4)
+ax.scatter([1], [1], s=150, color=TEXT2, zorder=3)
+ax.annotate("kõige rohkem autosid\nmahub läbi siin", (1, 1), xytext=(15, 5), textcoords="offset points", fontsize=14,
+            color=TEXT2)
+ax.text(0.6, 0.25, "tee on vaba:\nautod sõidavad kiiresti", fontsize=14, color=C_BLUE, fontweight="bold")
+ax.text(3.0, 0.62, "ummik: autod on tihedalt\nja liiguvad aeglaselt", fontsize=14, color=C_RED, fontweight="bold")
+ax.set_xlim(0, 4.9)
+ax.set_ylim(0, 1.25)
+ax.set_xticks([])
+ax.set_yticks([])
+ax.set_xlabel("kui tihedalt autod teel on →")
+ax.set_ylabel("mitu autot tunnis läbi sõidab →")
+ax.set_title("Kui autosid on liiga palju, sõidab läbi vähem autosid\nSama arvu autosid võib näha nii vabal teel kui "
+             "ummikus", loc="left")
+save(fig, "10_13_10yo")
+
+d_ = peatus(vm, KIIRENDUS[0])
+fig, ax = plt.subplots(figsize=(11, 4))
+ax.axhspan(-1, 1, color="#d9d8d3", lw=0)
+ax.axvline(0, color=C_RED, lw=4)
+ax.text(0, 1.15, "loendur (radar)\nja foor", ha="center", va="bottom", fontsize=13, color=TEXT2)
+ax.add_patch(plt.Rectangle((-d_ - 4.5, -0.45), 4.5, 0.9, color=C_BLUE))
+ax.annotate("", (-0.3, -0.75), (-d_, -0.75), arrowprops=dict(arrowstyle="<->", color=TEXT, lw=1.5))
+ax.text(-d_ / 2, -0.95, f"umbes {d_:.0f} m", ha="center", va="top", fontsize=14, color=TEXT)
+ax.text(-d_ - 2.25, 0.6, "esimene auto", ha="center", va="bottom", fontsize=13, color=C_BLUE)
+ax.set_xlim(-d_ - 12, 6)
+ax.set_ylim(-1.8, 2.3)
+ax.axis("off")
+ax.set_title(f"Kus seisab järjekorra esimene auto punase tule ajal?\nUmbes {d_:.0f} m enne loendurit. Rohelise tulega "
+             f"jõuab ta loendurini juba {vm:.0f} km/h kiirusega", loc="left")
+save(fig, "10_12_10yo")

@@ -12,7 +12,8 @@ SISEND
   common.load_vehicles(),              sõidukipõhised kirjed (logija nädala tööpäevad 16.-22.10.2026): nende järgi
   five_min_shares()                    jagatakse iga 15 min pilu kolmeks 5 min osaks (ristmik ilma kirjeteta saab
                                        ristmike keskmise jaotuse)
-  valjund/07_maantee_profiilid.csv     Tallinna ümbruse maanteeloendurite 15 min profiilid skriptist 07 (07 käib enne)
+  valjund/07_maantee_profiilid.csv     Tallinna ümbruse maanteeloendurite 15 min profiilid skriptist 07 (07 käib enne);
+                                       joonistel ainult linna piiriloendurite maanteed (common.PIIR_MAANTEE)
   common.load_fuel_county()            Harjumaa kütusemüük, liitrit päevas
   Keskkonnamuutujad: RES=15 -> toored 15 min andmed (failid *_15min); SUUND=LSS|LVS -> ainult linna sisse või linnast
   välja suunduvad kanalid, väljund alamkausta LSS või LVS (vt common).
@@ -69,10 +70,14 @@ VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/; suunaanalüüsi
       all, sama koha sisse ja välja järjest, koht oma varasema hommikuse tipptunni järgi), veerg = pilu. Värv = pilu
       osakaal ööpäeva liiklusest, % (tumedam = suurem; värviskaala otstes vähim ja suurim väärtus). Sinine ja oranž
       kriips = hommikune ja õhtune tipptund.
+  06_02b_5min_jagamine.png
+      Näitab: kuidas 15 min loendus jagatakse kolmeks 5 min osaks (kõik ristmikud kokku, kell 6-10, ainult RES=5).
+      Kuidas: hall tulp = 15 min loendus / 3 (ühtlane jaotus), sinine tulp = 5 min osa logija nädala proportsioonide järgi.
   06_03_tipptunnid.png
       Näitab: mis kell on tipptund igal ristmikul.
       Kuidas: rida = ristmik (järjestus nagu 06_02), x-telg = kellaaeg. Sinine riba = hommikune, oranž = õhtune
-      tipptund (60 min), riba järel maht (sõidukit tunnis). Taustavöönd = kõigi ristmike summa tipptund.
+      tipptund (60 min), riba järel maht (sõidukit tunnis). Taustavöönd = kõigi ristmike summa tipptund, punktiir =
+      summa liikluse keskaeg (sama mis 06_tipptunnid.csv rida KÕIK).
   06_04_nadalapaevad.png
       Näitab: nädalapäevade erinevust (õppetöö ajal, ilma pühadeta).
       Kuidas: joondiagramm, kõik ristmikud kokku; x-telg = kellaaeg, y-telg = tuhat sõidukit pilu kohta. E-N sinise
@@ -86,8 +91,8 @@ VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/; suunaanalüüsi
       Sinine punkt = hommikune tipptund, oranž = õhtune tipptund, hall kriips = ööpäev.
   06_07_hajutamine.png
       Näitab: kui palju väheneb tipptunni maht, kui osa sõitudest nihkub.
-      Kuidas: 3 x 2 paneeli (read: nihkujad jaotuvad ühtlaselt vahemikku +-Δ / pooleks täpselt +-Δ / kõik Δ võrra
-      hiljemaks ehk ühine nihe; veerud: hommik, õhtu). x-telg = tipptunnist nihkuvate sõidukite osakaal, %, y-telg = tipptunni mahu vähenemine, %. Jooned Δ = 15
+      Kuidas: 4 x 2 paneeli (read nagu töö tekstis: (1) kõik Δ võrra varem / (2) kõik Δ võrra hiljem / (3) pooleks
+      täpselt +-Δ / (4) ühtlaselt vahemikku +-Δ; veerud: hommik, õhtu). x-telg = tipptunnist nihkuvate sõidukite osakaal, %, y-telg = tipptunni mahu vähenemine, %. Jooned Δ = 15
       (türkiis), 30 (sinine) ja 60 min (oranž): ristmike mediaan, vöönd = kvartiilid. Katkendjoon "piir, kui liiklus
       +-1 h ühtlane" = ristmike teoreetilise hajutamise potentsiaali mediaan ehk suurim võimalik vähenemine.
   06_07b_hajutamine_20.png
@@ -95,7 +100,7 @@ VÄLJUND (joonised kaustas Graafikud/, tabelid kaustas valjund/; suunaanalüüsi
       kaupa - ühtlaselt ±30 ja ±60 min, pool 60 min varem ja pool hiljem, kõik 30 min hiljem; katkendjoon = piir, kui
       liiklus ±1 h ühtlane. Miinus = tipp väheneb.
   06_08_hajutamine_naide.png
-      Näitab: hajutamist suurima hommikuse tipuga ristmiku näitel.
+      Näitab: hajutamist MP19 näitel (suurim hommikune kiiruse langus linna suunal, sama mis 06_2_06b).
       Kuidas: joondiagramm kell 5-11; tume joon = praegune profiil, sinine = 20% tipptunni sõitudest jaotub +-30 min,
       oranž = +-60 min; hall vöönd = praegune tipptund. Legendis uus tipptunni maht ja vähenemine.
   06_09_kutus_harju.png
@@ -121,7 +126,7 @@ from common import (load_tallinn, load_junctions, peak_metrics, peak_hour, shift
                     spread_reduction, ratio_index, load_fuel_county, corr_pair, short_name,
                     set_style, save, save_table, AM_WINDOW, PM_WINDOW,
                     TALLINN_BASE_YEAR, VAHEAEG_LABEL, load_vehicles, five_min_shares, to_5min, OUT_DIR, SUUND,
-                    RES, SUFFIX, otsamargid, suunad_korvuti,
+                    RES, SUFFIX, otsamargid, suunad_korvuti, PIIR_MAANTEE,
                     C_BLUE, C_ORANGE, C_AQUA, C_GRAY, TEXT2)
 
 set_style()
@@ -165,7 +170,8 @@ city = prof.sum(axis=0)
 # Tallinna kaardi (07) maanteeloendurid: 15 min profiil 07-st (loenduri 15 min osakaaludega; muidu tunni piires ühtlane),
 # 5 min pilud ühtlaselt. mp_id < 0 = maantee.
 hwf = OUT_DIR / f"07_maantee_profiilid{SUFFIX}.csv"
-hw = pd.read_csv(hwf, encoding="utf-8-sig") if hwf.exists() else pd.DataFrame(columns=["koht", "samm"])
+hw = pd.read_csv(hwf, encoding="utf-8-sig", dtype={"id": str}) if hwf.exists() else pd.DataFrame(columns=["koht", "samm", "id"])
+hw = hw[hw["id"].isin(PIIR_MAANTEE)]           # ainult linna piiriloendurite maanteed (nagu 07_01bp)
 hw.index = -np.arange(1, len(hw) + 1)
 hprof = pd.DataFrame(np.repeat(hw[[str(i) for i in range(96)]].values / (PH // 4), PH // 4, axis=1)
                      if len(hw) else None, index=hw.index)
@@ -242,6 +248,19 @@ ax.set_ylabel("")
 ax.set_title(f"Liikluse jaotus päeva jooksul (tööpäev, õppetöö; {MIN} min); jooned = tipptunnid"
              + ("; all maanteeloendurid (andmed 15 min / 1 h)" if hw_order else ""))
 save(fig, "06_02_profiil_heatmap")
+if SH is not None:          # 06_02b: 15 min loenduse jagamine 5 min osadeks, kõik ristmikud kokku, hommik
+    a, b = 6 * PH, 10 * PH
+    fig, ax = plt.subplots(figsize=(9, 3.8))
+    ax.bar(X[a:b], np.repeat(city.values.reshape(-1, 3).sum(axis=1) / 3, 3)[a:b], width=1 / PH, color=C_GRAY,
+           alpha=0.35, label="15 min loendus / 3 (ühtlane jaotus)")
+    ax.bar(X[a:b], city.values[a:b], width=0.6 / PH, color=C_BLUE, label="5 min osad logija nädala proportsioonide järgi")
+    ax.set_xticks(range(6, 11))
+    ax.set_ylim(0, city.values[a:b].max() * 1.3)            # ruum legendile
+    ax.set_xlabel("Kellaaeg")
+    ax.set_ylabel("Sõidukeid 5 min kohta (kõik ristmikud)")
+    ax.legend(fontsize=8.5, loc="upper left")
+    ax.set_title("15 min loenduse jagamine 5 min osadeks (kõik ristmikud kokku, tööpäev)")
+    save(fig, "06_02b_5min_jagamine")
 
 # 1c) tipptunni ajastus: kus ja millal
 p2 = pm.set_index("mp_id").loc[hm_order[::-1]]          # alt üles: maanteed, siis ristmikud
@@ -251,16 +270,18 @@ for i, (mp, r) in enumerate(p2.iterrows()):
         ax.plot([h, h + 1], [i, i], color=col, lw=5, solid_capstyle="butt", alpha=0.9)
         ax.text(h + 1.08, i, f"{vol:,.0f}".replace(",", " "), va="center", fontsize=6.5, color=TEXT2)
 cr = pm[pm.mp_id == 0].iloc[0]
-for h, col in [(cr.hommik_algus_h, C_BLUE), (cr.ohtu_algus_h, C_ORANGE)]:
+for h, k, col in [(cr.hommik_algus_h, cr.hommik_keskaeg_h, C_BLUE), (cr.ohtu_algus_h, cr.ohtu_keskaeg_h, C_ORANGE)]:
     ax.axvspan(h, h + 1, color=col, alpha=0.08, lw=0)
+    ax.axvline(k, color=col, ls=":", lw=1.2)
 if hw_order:
     ax.axhline(len(hw_order) - 0.5, color="black", lw=1)
 ax.set_yticks(range(len(p2)))
 ax.set_yticklabels([silt[m] for m in p2.index], fontsize=fs)
 ax.set_xlim(5.5, 20)
 ax.set_xticks(range(6, 21))
-ax.set_xlabel(f"Kellaaeg (riba = tipptund, {MIN} min samm; number = sõidukit tunnis; taust = kõigi ristmike "
-              "ühine tipp)")
+ax.set_xlabel(f"Kellaaeg (riba = tipptund, {MIN} min samm; number = sõidukit tunnis; hall taust = kõigi ristmike "
+              f"ühine tipp;\npunktiir = kõigi ristmike liikluse keskaeg kell {cr.hommik_keskaeg.lstrip('0').replace(':', '.')} "
+              f"ja {cr.ohtu_keskaeg.replace(':', '.')})")
 ax.set_ylim(-0.7, len(p2) - 0.3)
 ax.set_title(f"Hommikune ja õhtune tipptund ({n} ristmikku" + (f", all {len(hw_order)} maanteeloendurit)"
                                                               if hw_order else ")"))
@@ -346,7 +367,9 @@ ax.set_yticks(yy)
 ax.set_yticklabels([j.at[m, "silt"] for m in pj.index], fontsize=fs)
 ax.set_ylim(-0.7, len(pj) - 0.3)
 ax.set_xlabel("Muutus lühikese koolivaheaja ajal, % (vs 2 nädalat enne ja pärast)")
-ax.set_title("Lühikese koolivaheaja mõju ristmike kaupa")
+md = pj.median()                                   # tekstis toodud ristmike mediaanid
+ax.set_title(f"Lühikese koolivaheaja mõju ristmike kaupa\nristmike mediaan: hommikune tipptund {md['hommik_soid_h']:+.1f}%, "
+             f"õhtune {md['ohtu_soid_h']:+.1f}%, ööpäev {md['ooopaev']:+.1f}%".replace(".", ","))
 ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.06 if len(pj) > 30 else -0.13), ncol=3, fontsize=8)
 save(fig, "06_06_koolivaheajad_ristmikud")
 
@@ -374,11 +397,12 @@ summary = pm[pm.mp_id >= 0].set_index("mp_id")[["code", "nimi", "hommik_algus", 
                                  "ohtu_max_potentsiaal_%"]].join(key)
 save_table(summary.reset_index(), "06_hajutamine_ristmikud")
 
-MODE_TITLE = {"mõlemad": "pool nihkub täpselt Δ võrra varem, pool hiljem",
+MODE_TITLE = {"varem": "kõik nihkuvad Δ võrra varem",
+              "mõlemad": "pool nihkub täpselt Δ võrra varem, pool hiljem",
               "ühtlane": "nihkuvad jaotuvad ühtlaselt vahemikku ±Δ",
-              "hiljem": "kõik nihkuvad Δ võrra hiljemaks (ühine nihe)"}
-fig, axes = plt.subplots(3, 2, figsize=(13, 12.6), sharey=True, sharex=True)
-for i, mode in enumerate(["ühtlane", "mõlemad", "hiljem"]):
+              "hiljem": "kõik nihkuvad Δ võrra hiljemaks"}
+fig, axes = plt.subplots(len(MODES), 2, figsize=(13, 4.2 * len(MODES)), sharey=True, sharex=True)
+for i, mode in enumerate(MODES):                    # järjekord nagu töö tekstis (2.3): (1) varem ... (4) ühtlane
     for k, (name, title) in enumerate([("hommik", "Hommikune tipptund"), ("ohtu", "Õhtune tipptund")]):
         ax = axes[i, k]
         sub = sc[(sc.tipp == name) & (sc.suund == mode) & (sc.mp_id > 0)]
@@ -387,19 +411,24 @@ for i, mode in enumerate(["ühtlane", "mõlemad", "hiljem"]):
             med, q1, q3 = g.median(), g.quantile(0.25), g.quantile(0.75)
             ax.fill_between(med.index, q1, q3, color=col, alpha=0.15, lw=0)
             ax.plot(med.index, med, color=col, marker="o", ms=4, label=f"Δ = {sh} min")
+            m19 = sub[(sub.nihe_min == sh) & (sub.mp_id == 19)].set_index("nihutatud_%")["tipu_vahenemine_%"]
+            ax.plot(m19.index, m19, color=col, ls=":", lw=1.5)
         pot = pm[pm.mp_id > 0][f"{name}_max_potentsiaal_%"].median()
         ax.axhline(pot, color=TEXT2, ls="--", lw=1)
-        ax.text(40, pot + 0.4, f"piir, kui liiklus ±1 h ühtlane: {pot:.1f}%", fontsize=8,
+        ax.text(30, pot + 0.4, f"piir, kui liiklus ±1 h ühtlane: {pot:.1f}%".replace(".", ","), fontsize=8,
                 color=TEXT2, ha="right")
         ax.axhline(0, color=TEXT2, lw=0.6)
-        ax.set_title(f"{title}: {MODE_TITLE[mode]}", fontsize=10)
-        if i == 2:
+        ax.set(xlim=(None, 30), ylim=(-20, 20))
+        ax.set_title(f"({i + 1}) {title}: {MODE_TITLE[mode]}", fontsize=10)
+        if i == len(MODES) - 1:
             ax.set_xlabel("Tipptunnist nihkuvate sõidukite osakaal, %")
     axes[i, 0].set_ylabel("Tipptunni mahu vähenemine, %")
+m19 = pm.set_index("mp_id").loc[19]
+axes[0, 0].plot([], [], color=TEXT2, ls=":", label=f"{m19.code} {m19.nimi}")
 axes[0, 0].legend(loc="lower left", fontsize=9)
-fig.suptitle("Hajutamise mõju tipptunnile (ristmike mediaan, vöönd = kvartiilid)",
+fig.suptitle(f"Hajutamise mõju tipptunnile (ristmike mediaan, vöönd = kvartiilid)\npunktiir = {m19.code} {m19.nimi}",
              x=0.01, ha="left", fontweight="bold")
-fig.tight_layout()
+fig.tight_layout(rect=(0, 0, 1, 1 - 0.3 / fig.get_figheight()))
 save(fig, "06_07_hajutamine")
 
 B07 = [("ühtlane", 30, "ühtlaselt ±30 min"), ("ühtlane", 60, "ühtlaselt ±60 min"),
@@ -425,8 +454,9 @@ ax.set_title("Kui 20% tipptunni sõitudest nihkub", fontsize=10, loc="left")
 fig.tight_layout()
 save(fig, "06_07b_hajutamine_20")
 
-# näide: suurima hommikuse tipuga ristmik
-top = pm[pm.mp_id > 0].sort_values("hommik_soid_h", ascending=False).iloc[0]
+# näide: MP19, kus linna sisse suunduva liikluse kiirus langeb hommikul kõige rohkem (sama ristmik mis 06_2_06b)
+# shortcut: ristmik on käsitsi valitud 06_2_06b väljundi järgi, muuda, kui 06_2_06b valib teise ristmiku
+top = pm[pm.mp_id == 19].iloc[0]
 v = prof.loc[top.mp_id].values
 s0, vol0 = peak_hour(v, AM_WINDOW, PH)
 fig, ax = plt.subplots(figsize=(9, 4.5))
@@ -436,11 +466,11 @@ for sh, col in [(30, C_BLUE), (60, C_ORANGE)]:
     new = shift_peak(v, s0, 0.2, sh // MIN, "ühtlane", per_hour=PH)
     _, nv = peak_hour(new, (AM_WINDOW[0] - 2, AM_WINDOW[1] + 2), PH)
     ax.plot(X[xs], new[xs], color=col, lw=1.8,
-            label=f"20% jaotub ±{sh} min: {nv:,.0f} sõid/h (−{(1 - nv / vol0) * 100:.1f}%)".replace(",", " "))
+            label=f"20% jaotub ±{sh} min: {nv:,.0f} sõid/h (−{(1 - nv / vol0) * 100:.1f}%)".replace(",", " ").replace(".", ","))
 ax.axvspan(s0 / PH, s0 / PH + 1, color=C_GRAY, alpha=0.12, lw=0)
 ax.set_xlabel("Kellaaeg")
 ax.set_ylabel(f"Sõidukeid {MIN} min kohta")
-ax.set_title(f"Hajutamise näide: {top.code} {top.nimi} (hommik, tüüpiline tööpäev)")
+ax.set_title(f"Hajutamise näide: {top.code} {top.nimi} (hommik, tüüpiline tööpäev)\nsuurim hommikune kiiruse langus linna suunal", fontsize=11)
 ax.legend(loc="lower right", fontsize=9)
 save(fig, "06_08_hajutamine_naide")
 
